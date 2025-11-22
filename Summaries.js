@@ -67,7 +67,7 @@ function displaySummaries(summaries) {
             <div class="summary-actions">
                 <button class="btn btn-preview"  style=" background: var(--primary-color);
     color: var(--white);
-    flex: 1; " onclick="openPDF(${s.id})">👁️ معاينة</button>
+    flex: 1; " onclick="openPDF(${s.id})"> معاينة</button>
             </div>
         `;
         container.appendChild(card);
