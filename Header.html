@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navbar Test</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='white' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+
+        .custom-navbar {
+            background: linear-gradient(90deg, #1e3c72, #2a5298);
+            padding: 10px 20px;
+        }
+
+        .nav-logo img {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+        }
+
+        .nav-brand {
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .nav-link {
+            color: white !important;
+            font-size: 1rem;
+            padding: 8px 15px;
+        }
+
+        .nav-link:hover {
+            color: #ffd44d !important;
+        }
+    </style>
+
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg custom-navbar">
+    <div class="container-fluid nav-container">
+
+        <a href="HomePage.html" class="nav-logo d-flex align-items-center">
+            <img src="logo.png" alt="Logo" class="logo-img">
+            <span class="nav-brand ms-2">أكاديمية ضياء الدين صبح</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMenu"
+                aria-controls="navbarMenu" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarMenu">
+            <ul class="navbar-nav ms-auto nav-links">
+                <li class="nav-item"><a class="nav-link" href="HomePage.html">الرئيسية</a></li>
+                <li class="nav-item"><a class="nav-link" href="Summaries.html">التلاخيص</a></li>
+                <li class="nav-item"><a class="nav-link" href="AboutUs.html">من نحن</a></li>
+                <li class="nav-item"><a class="nav-link" href="ContactUs.html">تواصل معنا</a></li>
+            </ul>
+        </div>
+
+    </div>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
