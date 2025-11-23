@@ -1,14 +1,5 @@
 
-
-/* =====================================================
-   Unified stylesheet - Optimized & Responsive
-   ===================================================== */
-
-/* -----------------------
-   Variables (theme)
-   ----------------------- */
 :root {
-    /* Colors */
     --primary-color: #3d5a80;
     --primary-dark:  #2c4458;
     --accent-color:  #daa520;
@@ -19,25 +10,19 @@
     --white:         #ffffff;
     --error-color:   #e74c3c;
 
-    /* Shadows */
     --shadow-sm:  0 2px 10px rgba(0,0,0,0.08);
     --shadow-md:  0 4px 15px rgba(0,0,0,0.10);
     --shadow-lg:  0 8px 25px rgba(0,0,0,0.15);
 
-    /* Fonts */
     --font-main: 'Tajawal', sans-serif;
     --font-sans: 'Tajwal', sans-serif;
 
-    /* Radii / spacing */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --container-max: 1400px;
 }
 
-/* -----------------------
-   Reset / Base
-   ----------------------- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
     font-family: var(--font-main);
@@ -48,12 +33,6 @@ body {
     direction: rtl;
 }
 
-/* -----------------------
-   Navbar with Hamburger Menu
-   ----------------------- */
-/* =========================
-   Navbar Custom Styles
-   ========================= */
 .navbar.custom-navbar {
     position: sticky;
     font-family: Tajawal;
@@ -94,7 +73,6 @@ body {
     letter-spacing: 0.5px;
 }
 
-/* Links */
 .nav-links {
     display: flex !important;
     flex-direction: row !important;
@@ -127,8 +105,6 @@ body {
     color: white;
 }
 
-
-/* Hamburger toggler */
 .navbar-toggler {
     border: none;
     padding: 6px;
@@ -142,13 +118,6 @@ body {
 
 
 
-
-
-/* =========================
-   Navbar
-/* -----------------------
-   Hero / Page Header
-   ----------------------- */
 .hero {
     background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
     color: var(--white);
@@ -199,9 +168,6 @@ body {
     letter-spacing: 1px;
 }
 
-/* -----------------------
-   CTA Section
-   ----------------------- */
 .cta-section {
     background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
     color: var(--white);
@@ -237,9 +203,6 @@ body {
     box-shadow: 0 6px 20px rgba(218,165,32,0.6);
 }
 
-/* -----------------------
-   Features Section
-   ----------------------- */
 .features {
     max-width: 1200px;
     margin: 60px auto;
@@ -294,9 +257,6 @@ body {
     font-size: 1.05rem;
 }
 
-/* -----------------------
-   Container & Filters
-   ----------------------- */
 .container {
     max-width: var(--container-max);
     margin: 0 auto;
@@ -344,9 +304,6 @@ input:hover, input:focus {
 
 .search-box { flex: 1; min-width: 250px; }
 
-/* -----------------------
-   Summary Cards
-   ----------------------- */
 .summaries-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -406,11 +363,6 @@ input:hover, input:focus {
     transform: translateY(-2px);
 }
 
-
-
-/* -----------------------
-   Buttons
-   ----------------------- */
 .btn {
     padding: 10px 20px;
     border: none;
@@ -453,9 +405,6 @@ input:hover, input:focus {
     transform: translateY(-2px);
 }
 
-/* -----------------------
-   Status Messages
-   ----------------------- */
 .loading, .no-results {
     text-align: center;
     color: var(--text-dark);
@@ -476,9 +425,6 @@ input:hover, input:focus {
     font-weight: 600;
 }
 
-/* -----------------------
-   Modal
-   ----------------------- */
 .modal {
     display: none;
     position: fixed;
@@ -559,9 +505,6 @@ iframe {
     margin-bottom: 25px;
 }
 
-/* -----------------------
-   About Us Sections
-   ----------------------- */
 .about-section {
     max-width: var(--container-max);
     margin: 0 auto;
@@ -610,7 +553,6 @@ iframe {
     top: 0;
 }
 
-/* Image Gallery */
 .image-gallery {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -655,7 +597,6 @@ iframe {
     font-size: 1rem;
 }
 
-/* Founder Section */
 .founder-section {
     background: var(--white);
     border-radius: var(--radius-lg);
@@ -723,7 +664,6 @@ iframe {
     font-weight: 700;
 }
 
-/* Academy Intro */
 .academy-intro {
     text-align: center;
     background: linear-gradient(135deg, rgba(61, 90, 128, 0.05), rgba(218, 165, 32, 0.05));
@@ -748,7 +688,6 @@ iframe {
     margin: 0 auto;
 }
 
-/* Statistics Section */
 .stats-section {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -789,7 +728,6 @@ iframe {
     font-weight: 500;
 }
 
-/* Mission & Vision */
 .mission-vision,
 .mission-services {
     display: grid;
@@ -825,7 +763,6 @@ iframe {
     line-height: 1.8;
 }
 
-/* Service Items */
 .service-item {
     margin-top: 25px;
     padding: 20px;
@@ -871,7 +808,6 @@ iframe {
     font-size: 1.5rem;
 }
 
-/* Impact List */
 .impact-list {
     list-style: none;
     padding: 0;
@@ -900,7 +836,6 @@ iframe {
     font-weight: 700;
 }
 
-/* Why Us Section */
 .why-us-section {
     background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
     color: var(--white);
@@ -930,7 +865,6 @@ iframe {
     font-weight: 700;
 }
 
-/* Most Visited Section */
 .most-visited {
     padding: 60px 20px;
     background: var(--bg-light);
@@ -981,7 +915,6 @@ iframe {
     margin-bottom: 15px;
 }
 
-/* Developers Section */
 .developers-section {
     max-width: var(--container-max);
     margin: 60px ;
@@ -1064,7 +997,6 @@ iframe {
     transform: translateY(-2px);
 }
 
-/* Contact Section */
 .contact-section {
     padding: 80px 20px;
     background: linear-gradient(135deg, var(--bg-light) 0%, #e6edf5 100%);
@@ -1148,7 +1080,6 @@ iframe {
     color: var(--accent-color);
 }
 
-/* Social Section */
 .social-section {
     background: var(--white);
     border-radius: 15px;
@@ -1202,7 +1133,6 @@ iframe {
     background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
 }
 
-/* Footer */
 footer, #footer-placeholder {
     background: var(--primary-dark);
     color: var(--white);
@@ -1255,18 +1185,8 @@ footer .footer-social-link:hover {
     transform: translateY(-3px);
 }
 
-/* =====================================================
-   RESPONSIVE DESIGN
-   ===================================================== */
-
-/* =====================================================
-   Responsive Adjustments for Navbar + Hero + Sections
-   ===================================================== */
-
-/* Tablets and below (968px) */
 @media (max-width: 968px) {
 
-    /* Navbar adjustments */
     .nav-container {
         padding: 10px 20px;
     }
@@ -1280,7 +1200,6 @@ footer .footer-social-link:hover {
         padding: 6px 12px;
     }
 
-    /* Hero adjustments */
     .hero {
         padding: 60px 15px;
     }
@@ -1302,7 +1221,6 @@ footer .footer-social-link:hover {
         height: 300px;
     }
 
-    /* CTA Section */
     .cta-section {
         padding: 40px 20px;
         margin: 40px 0;
@@ -1313,12 +1231,10 @@ footer .footer-social-link:hover {
         font-size: 1rem;
     }
 
-    /* Features grid */
     .features-grid {
         gap: 20px;
     }
 
-    /* Founder Section */
     .founder-content {
         grid-template-columns: 1fr;
         text-align: center;
@@ -1330,20 +1246,17 @@ footer .footer-social-link:hover {
         height: auto;
     }
 
-    /* Mission & Services */
     .mission-vision,
     .mission-services {
         grid-template-columns: 1fr;
         gap: 25px;
     }
 
-    /* Stats Section */
     .stats-section {
         grid-template-columns: 1fr;
         gap: 20px;
     }
 
-    /* Why Us Section */
     .why-us-section {
         padding: 40px 20px;
     }
@@ -1356,19 +1269,16 @@ footer .footer-social-link:hover {
         font-size: 1.1rem;
     }
 
-    /* Image Gallery */
     .image-gallery {
         grid-template-columns: 1fr;
         gap: 20px;
     }
 
-    /* Most Visited */
     .visited-grid {
         grid-template-columns: 1fr;
         gap: 20px;
     }
 
-    /* Developers */
     .developers-section {
         margin: 60px 0;
         padding: 0 20px;
@@ -1384,23 +1294,19 @@ footer .footer-social-link:hover {
         height: 120px;
     }
 
-    /* Footer Social */
     footer .social-links,
     footer .footer-social-links {
         flex-wrap: wrap;
         gap: 10px;
     }
 
-    /* Founder Section */
     .founder-section {
         padding: 30px 20px;
     }
 }
 
-/* Mobile Phones (600px and below) */
 @media (max-width: 600px) {
 
-    /* Navbar */
     .nav-container {
         padding: 8px 15px;
     }
@@ -1419,7 +1325,6 @@ footer .footer-social-link:hover {
         padding: 5px 10px;
     }
 
-    /* Hero */
     .hero {
         padding: 40px 10px;
     }
@@ -1441,7 +1346,6 @@ footer .footer-social-link:hover {
         height: 130px;
     }
 
-    /* CTA Section */
     .cta-section {
         padding: 30px 15px;
         margin: 30px 0;
@@ -1452,7 +1356,6 @@ footer .footer-social-link:hover {
         font-size: 0.95rem;
     }
 
-    /* Founder Section */
     .founder-section {
         padding: 20px 15px;
     }
