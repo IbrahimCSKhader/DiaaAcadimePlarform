@@ -93,22 +93,7 @@ function filterSummaries() {
   displaySummaries(filtered);
 }
 
-async function trackVisit(id) {
-  try {
-    await fetch(`${BASE_URL}/Summary/${id}/visit`, {
-      method: "POST",
-      headers: {
-        accept: "*/*",
-        "Content-Type": "application/json",
-      },
-    });
-  } catch (err) {
-    console.error("Error tracking visit:", err);
-  }
-}
-
 function openPDF(id) {
-  trackVisit(id);
   window.open(`view-pdf.html?id=${id}`, "_blank");
 }
 
