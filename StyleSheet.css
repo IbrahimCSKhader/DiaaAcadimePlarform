@@ -159,8 +159,8 @@ body {
 .hero-content { max-width: 900px; margin: 0 auto; }
 
 .hero-logo {
-    width: 200px;
-    height: 220px;
+    width: 450px;
+    height: 400px;
     border-radius: 50%;
     object-fit: cover;
 }
@@ -1298,8 +1298,8 @@ footer .footer-social-link:hover {
     }
 
     .hero-logo {
-        width: 150px;
-        height: 160px;
+        width: 300px;
+        height: 300px;
     }
 
     /* CTA Section */
@@ -1502,8 +1502,8 @@ footer .footer-social-link:hover {
     }
 
     .hero-logo {
-        width: 100px;
-        height: 110px;
+        width: 150px !important;
+        height: 110px !important;
     }
 }
 .navbar-toggler {
