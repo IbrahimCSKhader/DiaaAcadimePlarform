@@ -381,16 +381,20 @@
             let calculatedScale = availableWidth / standardPageWidth;
             
             if (window.innerWidth <= 480) {
-                calculatedScale = Math.min(calculatedScale, 0.65);
-            } else if (window.innerWidth <= 768) {
-                calculatedScale = Math.min(calculatedScale, 0.85);
-            } else if (window.innerWidth <= 1024) {
                 calculatedScale = Math.min(calculatedScale, 1.0);
+                calculatedScale = Math.max(calculatedScale, 0.8);
+            } else if (window.innerWidth <= 768) {
+                calculatedScale = Math.min(calculatedScale, 1.2);
+                calculatedScale = Math.max(calculatedScale, 1.0);
+            } else if (window.innerWidth <= 1024) {
+                calculatedScale = Math.min(calculatedScale, 1.4);
+                calculatedScale = Math.max(calculatedScale, 1.2);
             } else {
-                calculatedScale = Math.min(calculatedScale, 1.3);
+                calculatedScale = Math.min(calculatedScale, 1.8);
+                calculatedScale = Math.max(calculatedScale, 1.5);
             }
             
-            return Math.max(calculatedScale, 0.5);
+            return calculatedScale;
         }
 
         let scale = calculateScale();
@@ -440,12 +444,20 @@
                 pageWrapper.className = "page-wrapper";
                 pageWrapper.id = `page-${pageNum}`;
 
+                const devicePixelRatio = window.devicePixelRatio || 1;
+                const outputScale = devicePixelRatio;
+                
                 const pdfCanvas = document.createElement("canvas");
                 pdfCanvas.className = "pdf-canvas";
-                pdfCanvas.width = viewport.width;
-                pdfCanvas.height = viewport.height;
+                
+                pdfCanvas.width = Math.floor(viewport.width * outputScale);
+                pdfCanvas.height = Math.floor(viewport.height * outputScale);
+                pdfCanvas.style.width = viewport.width + "px";
+                pdfCanvas.style.height = viewport.height + "px";
 
                 const ctx = pdfCanvas.getContext("2d");
+                ctx.scale(outputScale, outputScale);
+                
                 await page.render({
                     canvasContext: ctx,
                     viewport: viewport
@@ -453,8 +465,14 @@
 
                 const drawCanvas = document.createElement("canvas");
                 drawCanvas.className = "draw-canvas";
-                drawCanvas.width = viewport.width;
-                drawCanvas.height = viewport.height;
+                
+                drawCanvas.width = Math.floor(viewport.width * outputScale);
+                drawCanvas.height = Math.floor(viewport.height * outputScale);
+                drawCanvas.style.width = viewport.width + "px";
+                drawCanvas.style.height = viewport.height + "px";
+                
+                const drawCtx = drawCanvas.getContext("2d");
+                drawCtx.scale(outputScale, outputScale);
 
                 pageWrapper.appendChild(pdfCanvas);
                 pageWrapper.appendChild(drawCanvas);
