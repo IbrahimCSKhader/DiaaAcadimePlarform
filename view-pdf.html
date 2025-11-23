@@ -499,9 +499,22 @@
                 const displayHeight = rect.height;
                 const scaleX = actualWidth / displayWidth;
                 const scaleY = actualHeight / displayHeight;
+                
+                let clientX, clientY;
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else if (e.changedTouches && e.changedTouches.length > 0) {
+                    clientX = e.changedTouches[0].clientX;
+                    clientY = e.changedTouches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                
                 return {
-                    x: (e.clientX - rect.left) * scaleX,
-                    y: (e.clientY - rect.top) * scaleY
+                    x: (clientX - rect.left) * scaleX,
+                    y: (clientY - rect.top) * scaleY
                 };
             }
 
@@ -558,49 +571,78 @@
             let touchStartX = 0;
             let touchStartY = 0;
             let isDrawingTouch = false;
+            let lastTouchX = 0;
+            let lastTouchY = 0;
 
-            canvas.addEventListener("touchstart", (e) => {
+            function handleTouchStart(e) {
                 if (drawingMode === 'none') {
                     return;
                 }
                 e.preventDefault();
+                e.stopPropagation();
                 isDrawingTouch = true;
                 const touch = e.touches[0];
-                touchStartX = touch.clientX;
-                touchStartY = touch.clientY;
-                const mouseEvent = new MouseEvent("mousedown", {
-                    clientX: touch.clientX,
-                    clientY: touch.clientY
-                });
-                canvas.dispatchEvent(mouseEvent);
-            });
+                const coords = getCoordinates(touch);
+                lastTouchX = coords.x;
+                lastTouchY = coords.y;
+                drawing = true;
+                ctx.beginPath();
+                ctx.moveTo(lastTouchX, lastTouchY);
+            }
 
-            canvas.addEventListener("touchmove", (e) => {
-                if (drawingMode === 'none' || !isDrawingTouch) {
+            function handleTouchMove(e) {
+                if (drawingMode === 'none' || !isDrawingTouch || !drawing) {
                     return;
                 }
                 e.preventDefault();
+                e.stopPropagation();
                 const touch = e.touches[0];
-                const mouseEvent = new MouseEvent("mousemove", {
-                    clientX: touch.clientX,
-                    clientY: touch.clientY
-                });
-                canvas.dispatchEvent(mouseEvent);
-            });
+                const coords = getCoordinates(touch);
 
-            canvas.addEventListener("touchend", (e) => {
+                if (drawingMode === 'pen') {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.strokeStyle = '#ffeb3b';
+                    ctx.lineWidth = 3;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.lineTo(coords.x, coords.y);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(coords.x, coords.y);
+                } else if (drawingMode === 'eraser') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.lineWidth = 20;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.lineTo(coords.x, coords.y);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(coords.x, coords.y);
+                }
+
+                lastTouchX = coords.x;
+                lastTouchY = coords.y;
+            }
+
+            function handleTouchEnd(e) {
                 if (!isDrawingTouch) {
                     return;
                 }
                 e.preventDefault();
+                e.stopPropagation();
                 isDrawingTouch = false;
-                const mouseEvent = new MouseEvent("mouseup", {});
-                canvas.dispatchEvent(mouseEvent);
-            });
+                drawing = false;
+                ctx.beginPath();
+            }
 
+            canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
+            canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
+            canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
             canvas.addEventListener("touchcancel", (e) => {
                 isDrawingTouch = false;
-            });
+                drawing = false;
+                ctx.beginPath();
+            }, { passive: false });
         }
 
         function updateDrawingMode() {
