@@ -39,6 +39,8 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            width: 100%;
+            max-width: 100%;
         }
 
         .pdf-canvas {
@@ -272,6 +274,33 @@
             #viewerContainer {
                 padding: 100px 10px 20px;
             }
+
+            .page-wrapper {
+                width: 100%;
+                margin: 15px 0;
+                max-width: 100%;
+            }
+
+            .pdf-canvas {
+                max-width: 100%;
+                height: auto;
+            }
+
+            .draw-canvas {
+                max-width: 100%;
+                height: auto;
+            }
+
+        }
+
+        @media (max-width: 480px) {
+            #viewerContainer {
+                padding: 90px 5px 15px;
+            }
+
+            .page-wrapper {
+                margin: 10px 0;
+            }
         }
     </style>
 
@@ -333,9 +362,34 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc =
             "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-        let scale = window.innerWidth < 600 ? 1.0 :
-                    window.innerWidth < 900 ? 1.2 : 1.5;
+        function calculateScale() {
+            const container = document.getElementById("viewerContainer");
+            let containerWidth = window.innerWidth;
+            
+            if (container) {
+                containerWidth = container.clientWidth;
+            }
+            
+            const padding = window.innerWidth <= 768 ? 20 : 40;
+            const availableWidth = containerWidth - padding;
+            
+            const standardPageWidth = 612;
+            let calculatedScale = availableWidth / standardPageWidth;
+            
+            if (window.innerWidth <= 480) {
+                calculatedScale = Math.min(calculatedScale, 0.65);
+            } else if (window.innerWidth <= 768) {
+                calculatedScale = Math.min(calculatedScale, 0.85);
+            } else if (window.innerWidth <= 1024) {
+                calculatedScale = Math.min(calculatedScale, 1.0);
+            } else {
+                calculatedScale = Math.min(calculatedScale, 1.3);
+            }
+            
+            return Math.max(calculatedScale, 0.5);
+        }
 
+        let scale = calculateScale();
         let pdfDoc = null;
         let currentPage = 1;
         let drawingMode = 'none';
@@ -371,6 +425,8 @@
             drawCanvases = [];
             pageWrappers = [];
 
+            scale = calculateScale();
+
             for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
                 const page = await pdfDoc.getPage(pageNum);
                 const viewport = page.getViewport({ scale });
@@ -378,7 +434,6 @@
                 const pageWrapper = document.createElement("div");
                 pageWrapper.className = "page-wrapper";
                 pageWrapper.id = `page-${pageNum}`;
-                pageWrapper.style.width = viewport.width + "px";
 
                 const pdfCanvas = document.createElement("canvas");
                 pdfCanvas.className = "pdf-canvas";
@@ -395,8 +450,6 @@
                 drawCanvas.className = "draw-canvas";
                 drawCanvas.width = viewport.width;
                 drawCanvas.height = viewport.height;
-                drawCanvas.style.width = viewport.width + "px";
-                drawCanvas.style.height = viewport.height + "px";
 
                 pageWrapper.appendChild(pdfCanvas);
                 pageWrapper.appendChild(drawCanvas);
@@ -417,8 +470,12 @@
 
             function getCoordinates(e) {
                 const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
+                const actualWidth = canvas.width;
+                const actualHeight = canvas.height;
+                const displayWidth = rect.width;
+                const displayHeight = rect.height;
+                const scaleX = actualWidth / displayWidth;
+                const scaleY = actualHeight / displayHeight;
                 return {
                     x: (e.clientX - rect.left) * scaleX,
                     y: (e.clientY - rect.top) * scaleY
@@ -601,6 +658,17 @@
             updateDrawingMode();
             document.getElementById("eraserTool").classList.toggle("active", drawingMode === 'eraser');
             document.getElementById("penTool").classList.toggle("active", false);
+        });
+
+        let resizeTimeout;
+        window.addEventListener("resize", () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (pdfDoc) {
+                    renderAllPages();
+                    updatePageInfo();
+                }
+            }, 300);
         });
 
     </script>
