@@ -426,6 +426,7 @@
             pdfDoc = pdf;
             await renderAllPages();
             updateDrawingMode();
+            setupNavigation();
             document.getElementById("loader").style.display = "none";
             updatePageInfo();
         }).catch(err => {
@@ -673,9 +674,21 @@
         }
 
         function scrollToPage(pageNum) {
+            if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) {
+                return;
+            }
             const pageElement = document.getElementById(`page-${pageNum}`);
             if (pageElement) {
-                pageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const container = document.getElementById("viewerContainer");
+                const containerRect = container.getBoundingClientRect();
+                const elementRect = pageElement.getBoundingClientRect();
+                const scrollTop = container.scrollTop + (elementRect.top - containerRect.top) - (containerRect.height / 2) + (elementRect.height / 2);
+                
+                container.scrollTo({
+                    top: scrollTop,
+                    behavior: 'smooth'
+                });
+                
                 currentPage = pageNum;
                 updatePageInfo();
             }
@@ -710,25 +723,52 @@
             }, 100);
         });
 
-        document.getElementById("nextBtn").onclick = () => {
-            if (currentPage < pdfDoc.numPages) {
-                scrollToPage(currentPage + 1);
-            }
-        };
+        function setupNavigation() {
+            const nextBtn = document.getElementById("nextBtn");
+            const prevBtn = document.getElementById("prevBtn");
+            const goBtn = document.getElementById("goBtn");
+            const jumpPageInput = document.getElementById("jumpPage");
 
-        document.getElementById("prevBtn").onclick = () => {
-            if (currentPage > 1) {
-                scrollToPage(currentPage - 1);
+            if (nextBtn) {
+                nextBtn.onclick = () => {
+                    if (pdfDoc && currentPage < pdfDoc.numPages) {
+                        scrollToPage(currentPage + 1);
+                    }
+                };
             }
-        };
 
-        document.getElementById("goBtn").onclick = () => {
-            const p = parseInt(document.getElementById("jumpPage").value);
-            if (p >= 1 && p <= pdfDoc.numPages) {
-                scrollToPage(p);
-                document.getElementById("jumpPage").value = "";
+            if (prevBtn) {
+                prevBtn.onclick = () => {
+                    if (pdfDoc && currentPage > 1) {
+                        scrollToPage(currentPage - 1);
+                    }
+                };
             }
-        };
+
+            if (goBtn && jumpPageInput) {
+                goBtn.onclick = () => {
+                    if (!pdfDoc) return;
+                    const p = parseInt(jumpPageInput.value);
+                    if (p >= 1 && p <= pdfDoc.numPages) {
+                        scrollToPage(p);
+                        jumpPageInput.value = "";
+                    }
+                };
+
+                jumpPageInput.addEventListener("keypress", (e) => {
+                    if (e.key === "Enter") {
+                        if (!pdfDoc) return;
+                        const p = parseInt(jumpPageInput.value);
+                        if (p >= 1 && p <= pdfDoc.numPages) {
+                            scrollToPage(p);
+                            jumpPageInput.value = "";
+                        }
+                    }
+                });
+            }
+        }
+
+        setupNavigation();
 
         const menuToggle = document.getElementById("menuToggle");
         const menuItems = document.getElementById("menuItems");
