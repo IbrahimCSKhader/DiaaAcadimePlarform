@@ -8,9 +8,14 @@ fetch(apiUrl)
       const card = document.createElement("div");
       card.className = "visited-card";
 
+      const viewCount = item.visits || 0;
       card.innerHTML = `
                 <h3>${item.name}</h3>
                 <p>${item.specializationName}</p>
+                <div class="visited-views">
+                    <i class="fas fa-eye"></i>
+                    <span>${viewCount}</span>
+                </div>
                 <a href="view-pdf.html?id=${item.id}" class="view-button">عرض الملف</a>
             `;
 

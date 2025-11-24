@@ -935,6 +935,27 @@ iframe {
     margin-bottom: 15px;
 }
 
+.visited-views {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-light);
+    font-size: 0.95rem;
+    margin-bottom: 15px;
+    margin-top: 10px;
+}
+
+.visited-views i {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
+
+.visited-views span {
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
 .developers-section {
     max-width: var(--container-max);
     margin: 60px ;
