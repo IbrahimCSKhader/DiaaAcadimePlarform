@@ -419,17 +419,29 @@
             return calculatedScale;
         }
 
+        // Detect iOS Safari
+        const isIOSSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        
         let scale = calculateScale();
         let pdfDoc = null;
         let currentPage = 1;
         let drawingMode = 'none';
         let drawCanvases = [];
         let pageWrappers = [];
+        let renderedPages = new Map(); // Track which pages are rendered
+        let pagePromises = new Map(); // Track page rendering promises
+        
+        // Reduce memory usage on iOS
+        const maxPixelRatio = isIOSSafari ? 1.5 : (window.devicePixelRatio || 1);
+        
         const loadingTask = pdfjsLib.getDocument({
             url: url,
             disableAutoFetch: false,
             disableStream: false,
-            disableRange: false
+            disableRange: false,
+            // Add memory optimizations for iOS
+            maxImageSize: isIOSSafari ? 1024 * 1024 : Infinity,
+            isEvalSupported: false
         });
 
         loadingTask.onProgress = function (progress) {
@@ -441,15 +453,163 @@
 
         loadingTask.promise.then(async (pdf) => {
             pdfDoc = pdf;
-            await renderAllPages();
+            // On iOS, use lazy loading instead of rendering all pages
+            if (isIOSSafari) {
+                await initializeLazyLoading();
+            } else {
+                await renderAllPages();
+            }
             updateDrawingMode();
             setupNavigation();
             document.getElementById("loader").style.display = "none";
             updatePageInfo();
         }).catch(err => {
             console.error("PDF.js Error:", err);
-            document.getElementById("loader").innerText = "Failed to load PDF";
+            document.getElementById("loader").innerText = "Failed to load PDF. Please try again.";
+            // Show user-friendly error
+            if (err.name === 'RenderingCancelledException' || err.message.includes('memory')) {
+                document.getElementById("loader").innerHTML = 
+                    "PDF is too large for this device. Try a smaller file or use a desktop browser.";
+            }
         });
+
+        // Initialize lazy loading - create placeholders for all pages
+        async function initializeLazyLoading() {
+            const viewer = document.getElementById("viewerContainer");
+            viewer.innerHTML = "";
+            drawCanvases = [];
+            pageWrappers = [];
+            renderedPages.clear();
+            pagePromises.clear();
+
+            scale = calculateScale();
+
+            // Create placeholders for all pages
+            for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+                const pageWrapper = document.createElement("div");
+                pageWrapper.className = "page-wrapper";
+                pageWrapper.id = `page-${pageNum}`;
+                pageWrapper.style.minHeight = "800px"; // Placeholder height
+                pageWrapper.innerHTML = '<div style="text-align:center;padding:50px;color:#999;">Loading page ' + pageNum + '...</div>';
+                viewer.appendChild(pageWrapper);
+                pageWrappers.push(pageWrapper);
+            }
+
+            // Render first few pages immediately
+            const initialPages = Math.min(3, pdfDoc.numPages);
+            for (let i = 1; i <= initialPages; i++) {
+                await renderPage(i);
+            }
+
+            // Set up intersection observer for lazy loading
+            setupIntersectionObserver();
+        }
+
+        // Render a single page
+        async function renderPage(pageNum) {
+            if (renderedPages.has(pageNum)) {
+                return; // Already rendered
+            }
+
+            // Check if already rendering
+            if (pagePromises.has(pageNum)) {
+                return pagePromises.get(pageNum);
+            }
+
+            const renderPromise = (async () => {
+                try {
+                    const page = await pdfDoc.getPage(pageNum);
+                    const viewport = page.getViewport({ scale });
+
+                    const pageWrapper = document.getElementById(`page-${pageNum}`);
+                    if (!pageWrapper) return;
+
+                    // Clear placeholder
+                    pageWrapper.innerHTML = "";
+                    pageWrapper.style.minHeight = "";
+
+                    // Use reduced pixel ratio on iOS to save memory
+                    const outputScale = isIOSSafari ? Math.min(maxPixelRatio, 1.5) : (window.devicePixelRatio || 1);
+                    
+                    const pdfCanvas = document.createElement("canvas");
+                    pdfCanvas.className = "pdf-canvas";
+                    
+                    pdfCanvas.width = Math.floor(viewport.width * outputScale);
+                    pdfCanvas.height = Math.floor(viewport.height * outputScale);
+                    pdfCanvas.style.width = viewport.width + "px";
+                    pdfCanvas.style.height = viewport.height + "px";
+
+                    const ctx = pdfCanvas.getContext("2d");
+                    ctx.scale(outputScale, outputScale);
+                    
+                    await page.render({
+                        canvasContext: ctx,
+                        viewport: viewport
+                    }).promise;
+
+                    const drawCanvas = document.createElement("canvas");
+                    drawCanvas.className = "draw-canvas";
+                    
+                    drawCanvas.width = Math.floor(viewport.width * outputScale);
+                    drawCanvas.height = Math.floor(viewport.height * outputScale);
+                    drawCanvas.style.width = viewport.width + "px";
+                    drawCanvas.style.height = viewport.height + "px";
+                    
+                    const drawCtx = drawCanvas.getContext("2d");
+                    drawCtx.scale(outputScale, outputScale);
+
+                    pageWrapper.appendChild(pdfCanvas);
+                    pageWrapper.appendChild(drawCanvas);
+
+                    const drawCanvasIndex = pageNum - 1;
+                    if (drawCanvases[drawCanvasIndex]) {
+                        drawCanvases[drawCanvasIndex] = drawCanvas;
+                    } else {
+                        drawCanvases[drawCanvasIndex] = drawCanvas;
+                    }
+
+                    enableDrawing(drawCanvas);
+                    renderedPages.set(pageNum, true);
+                } catch (err) {
+                    console.error(`Error rendering page ${pageNum}:`, err);
+                    const pageWrapper = document.getElementById(`page-${pageNum}`);
+                    if (pageWrapper) {
+                        pageWrapper.innerHTML = '<div style="text-align:center;padding:50px;color:#f00;">Error loading page ' + pageNum + '</div>';
+                    }
+                } finally {
+                    pagePromises.delete(pageNum);
+                }
+            })();
+
+            pagePromises.set(pageNum, renderPromise);
+            return renderPromise;
+        }
+
+        // Set up intersection observer for lazy loading
+        function setupIntersectionObserver() {
+            if (!('IntersectionObserver' in window)) {
+                // Fallback: render all pages if IntersectionObserver not supported
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+                    renderPage(i);
+                }
+                return;
+            }
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const pageNum = parseInt(entry.target.id.replace('page-', ''));
+                        renderPage(pageNum);
+                    }
+                });
+            }, {
+                rootMargin: '200px' // Start loading 200px before page comes into view
+            });
+
+            pageWrappers.forEach(wrapper => {
+                observer.observe(wrapper);
+            });
+        }
 
         async function renderAllPages() {
             const viewer = document.getElementById("viewerContainer");
@@ -467,8 +627,8 @@
                 pageWrapper.className = "page-wrapper";
                 pageWrapper.id = `page-${pageNum}`;
 
-                const devicePixelRatio = window.devicePixelRatio || 1;
-                const outputScale = devicePixelRatio;
+                // Use reduced pixel ratio on iOS to save memory
+                const outputScale = isIOSSafari ? Math.min(maxPixelRatio, 1.5) : (window.devicePixelRatio || 1);
                 
                 const pdfCanvas = document.createElement("canvas");
                 pdfCanvas.className = "pdf-canvas";
@@ -663,14 +823,17 @@
                 ctx.beginPath();
             }
 
-            canvas.addEventListener("touchstart", handleTouchStart, { passive: false, capture: true });
-            canvas.addEventListener("touchmove", handleTouchMove, { passive: false, capture: true });
-            canvas.addEventListener("touchend", handleTouchEnd, { passive: false, capture: true });
-            canvas.addEventListener("touchcancel", handleTouchCancel, { passive: false, capture: true });
+            // Optimize touch events for iOS Safari
+            const touchOptions = isIOSSafari ? { passive: false } : { passive: false, capture: true };
+            canvas.addEventListener("touchstart", handleTouchStart, touchOptions);
+            canvas.addEventListener("touchmove", handleTouchMove, touchOptions);
+            canvas.addEventListener("touchend", handleTouchEnd, touchOptions);
+            canvas.addEventListener("touchcancel", handleTouchCancel, touchOptions);
         }
 
         function updateDrawingMode() {
             drawCanvases.forEach(canvas => {
+                if (!canvas) return; // Skip if canvas not rendered yet
                 canvas.className = "draw-canvas";
                 if (drawingMode === 'pen') {
                     canvas.classList.add('pen-mode');
@@ -684,10 +847,19 @@
             });
         }
 
-        function scrollToPage(pageNum) {
+        async function scrollToPage(pageNum) {
             if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) {
                 return;
             }
+            
+            // Ensure page is rendered before scrolling (important for lazy loading)
+            if (isIOSSafari && !renderedPages.has(pageNum)) {
+                await renderPage(pageNum);
+                // Also render adjacent pages
+                if (pageNum > 1) await renderPage(pageNum - 1);
+                if (pageNum < pdfDoc.numPages) await renderPage(pageNum + 1);
+            }
+            
             const pageElement = document.getElementById(`page-${pageNum}`);
             if (pageElement) {
                 const container = document.getElementById("viewerContainer");
@@ -835,14 +1007,23 @@
                     const oldScale = scale;
                     scale = calculateScale();
                     if (Math.abs(oldScale - scale) > 0.1) {
-                        renderAllPages();
-                        updatePageInfo();
+                        // On iOS, reinitialize lazy loading instead of rendering all
+                        if (isIOSSafari) {
+                            initializeLazyLoading().then(() => {
+                                updateDrawingMode();
+                                updatePageInfo();
+                            });
+                        } else {
+                            renderAllPages();
+                            updatePageInfo();
+                        }
                     }
                 }
             }, 800);
         }
         
-        if (window.innerWidth > 768) {
+        // Only enable resize handler on larger screens or non-iOS devices
+        if (window.innerWidth > 768 || !isIOSSafari) {
             window.addEventListener("resize", handleResize);
         }
 
