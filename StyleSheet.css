@@ -346,6 +346,26 @@ input:hover, input:focus {
     min-width: 100px;
 }
 
+.summary-views {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-light);
+    font-size: 0.95rem;
+    margin-bottom: 15px;
+    margin-top: 10px;
+}
+
+.summary-views i {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
+
+.summary-views span {
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
 .summary-actions {
     display: flex;
     gap: 12px;

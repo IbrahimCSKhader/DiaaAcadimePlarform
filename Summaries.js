@@ -65,11 +65,16 @@ function displaySummaries(summaries) {
     const card = document.createElement("div");
     card.className = "summary-card";
     const safeName = (s.name || "file").replace(/'/g, "\\'");
+    const viewCount = s.visits;
     card.innerHTML = `
             <div class="summary-title">${s.name || "بدون عنوان"}</div>
             <div class="summary-info"><strong>التخصص:</strong> ${
               s.specializationName || "عام"
             }</div>
+            <div class="summary-views">
+                <i class="fas fa-eye"></i>
+                <span>${viewCount}</span>
+            </div>
             <div class="summary-actions">
                 <button class="btn btn-preview"  style=" background: var(--primary-color);
     color: var(--white);
