@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Viewer</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #1a1a1a;
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+
+        #viewerContainer {
+            width: 100%;
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 80px 20px 20px;
+            position: relative;
+        }
+
+        .page-wrapper {
+            position: relative;
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .pdf-canvas {
+            margin: 0;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            max-width: 100%;
+            display: block;
+            background: white;
+        }
+
+        /* Image-based viewer styles (for iOS) */
+        .pdf-image-page {
+            margin: 0;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            max-width: 100%;
+            width: 100%;
+            height: auto;
+            display: block;
+            background: white;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            pointer-events: none;
+            -webkit-user-drag: none;
+        }
+
+        .pdf-image-page.loading {
+            min-height: 800px;
+            background: #2a2a2a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+        }
+
+        /* Drawing canvas overlay (for iOS images) */
+        .draw-canvas {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: auto;
+            border-radius: 8px;
+            touch-action: none;
+        }
+
+        .draw-canvas.no-drawing {
+            pointer-events: none;
+        }
+
+        .draw-canvas.pen-mode {
+            cursor: crosshair;
+        }
+
+        .draw-canvas.eraser-mode {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="10" fill="none" stroke="white" stroke-width="2"/></svg>') 12 12, auto;
+        }
+
+        #loader {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            z-index: 9999;
+            font-size: 22px;
+            text-align: center;
+            font-weight: 600;
+            background: rgba(0,0,0,0.8);
+            padding: 30px 50px;
+            border-radius: 12px;
+        }
+
+        #loader #percent {
+            display: block;
+            margin-top: 10px;
+            font-size: 16px;
+            color: #aaa;
+        }
+
+        #controls {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: rgba(0,0,0,0.85);
+            padding: 12px 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        #controls.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #controls button {
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 8px;
+            border: none;
+            background: #3d5a80;
+            color: white;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+
+        #controls button:hover {
+            background: #2c4458;
+        }
+
+        #controls button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        #controls #pageInfo {
+            padding: 0 12px;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        #controls input {
+            padding: 8px 12px;
+            font-size: 14px;
+            border-radius: 8px;
+            border: 1px solid #555;
+            background: #2a2a2a;
+            color: white;
+            width: 80px;
+        }
+
+        #optionsMenu {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 10001;
+        }
+
+        #menuToggle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3d5a80, #2c4458);
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #menuToggle:hover {
+            transform: scale(1.1);
+        }
+
+        #menuToggle.active {
+            transform: rotate(45deg);
+        }
+
+        #menuItems {
+            position: absolute;
+            bottom: 80px;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            border-radius: 12px;
+            padding: 10px;
+            min-width: 200px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            opacity: 0;
+            transform: translateY(20px) scale(0.9);
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        #menuItems.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: all;
+        }
+
+        .menu-item {
+            padding: 12px 16px;
+            color: white;
+            cursor: pointer;
+            border-radius: 8px;
+            margin: 4px 0;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+
+        .menu-item:hover {
+            background: rgba(61, 90, 128, 0.3);
+        }
+
+        .menu-item.active {
+            background: rgba(61, 90, 128, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            #viewerContainer {
+                padding: 100px 10px 20px;
+            }
+
+            #controls {
+                flex-wrap: wrap;
+                max-width: 90vw;
+                padding: 10px 15px;
+                gap: 8px;
+            }
+        }
+    </style>
+
+    <!-- PDF.js only loaded for non-iOS devices -->
+    <script>
+        // Detect iOS devices
+        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        
+        // Only load PDF.js for non-iOS devices
+        if (!isIOS) {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+            document.head.appendChild(script);
+        }
+    </script>
+</head>
+
+<body oncontextmenu="return false">
+
+    <div id="controls" class="hidden">
+        <button id="prevBtn">⟸ Previous</button>
+        <span id="pageInfo">Page 1 / ?</span>
+        <button id="nextBtn">Next ⟹</button>
+        <input type="number" id="jumpPage" min="1" placeholder="Go to page" />
+        <button id="goBtn">Go</button>
+    </div>
+
+    <div id="optionsMenu">
+        <button id="menuToggle">☰</button>
+        <div id="menuItems">
+            <div class="menu-item" id="toggleNav">
+                <span class="menu-item-icon">🧭</span>
+                <span>Show/Hide Navigation</span>
+            </div>
+            <div class="menu-item" id="penTool">
+                <span class="menu-item-icon">✏️</span>
+                <span>Pen Tool</span>
+            </div>
+            <div class="menu-item" id="eraserTool">
+                <span class="menu-item-icon">🧹</span>
+                <span>Eraser Tool</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="loader">
+        Loading PDF...
+        <div id="percent">0%</div>
+    </div>
+
+    <div id="viewerContainer"></div>
+
+    <script>
+        // Prevent download, save, print on all devices
+        document.onkeydown = function (e) {
+            if (e.ctrlKey && ["s", "S", "p", "P", "u", "U"].includes(e.key)) {
+                e.preventDefault();
+            }
+        };
+
+        // Disable context menu
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            return false;
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get("id");
+
+        if (!id) {
+            document.getElementById("loader").innerText = "Invalid File ID";
+            throw new Error("Missing id");
+        }
+
+        const BASE_URL = 'https://diaaapi.premiumasp.net/api';
+
+        async function trackVisit(summaryId) {
+            try {
+                await fetch(`${BASE_URL}/Summary/${summaryId}/visit`, {
+                    method: 'POST',
+                    headers: {
+                        'accept': '*/*',
+                        'Content-Type': 'application/json'
+                    }
+                });
+            } catch (err) {
+                console.error('Error tracking visit:', err);
+            }
+        }
+
+        trackVisit(id);
+
+        // ============================================
+        // iOS IMAGE-BASED VIEWER
+        // ============================================
+        if (isIOS) {
+            let totalPages = 0;
+            let currentPage = 1;
+            let pageWrappers = [];
+            let drawingMode = 'none';
+            let drawCanvases = [];
+
+            // Disable text selection and image save on iOS
+            document.addEventListener('selectstart', function(e) {
+                e.preventDefault();
+                return false;
+            });
+
+            document.addEventListener('touchstart', function(e) {
+                if (e.target.tagName === 'IMG') {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            async function loadPdfAsImages() {
+                try {
+                    document.getElementById("loader").innerText = "Loading images...";
+                    
+                    // Call the image-pages endpoint
+                    const response = await fetch(`${BASE_URL}/Summary/${id}/image-pages`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Failed to load images: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    totalPages = data.pages.length;
+
+                    if (totalPages === 0) {
+                        document.getElementById("loader").innerText = "No pages found";
+                        return;
+                    }
+
+                    // Initialize viewer
+                    const viewer = document.getElementById("viewerContainer");
+                    viewer.innerHTML = "";
+                    pageWrappers = [];
+                    drawCanvases = [];
+
+                    // Create page wrappers with images
+                    data.pages.forEach((imageUrl, index) => {
+                        const pageNum = index + 1;
+                        const pageWrapper = document.createElement("div");
+                        pageWrapper.className = "page-wrapper";
+                        pageWrapper.id = `page-${pageNum}`;
+                        
+                        const img = document.createElement("img");
+                        img.className = "pdf-image-page loading";
+                        img.alt = `Page ${pageNum}`;
+                        img.loading = "lazy";
+                        img.draggable = false;
+                        
+                        // Prevent image download/save
+                        img.oncontextmenu = function(e) { e.preventDefault(); return false; };
+                        img.onselectstart = function(e) { e.preventDefault(); return false; };
+                        img.ondragstart = function(e) { e.preventDefault(); return false; };
+                        
+                        // Create drawing canvas overlay
+                        const drawCanvas = document.createElement("canvas");
+                        drawCanvas.className = "draw-canvas no-drawing";
+                        drawCanvas.id = `draw-canvas-${pageNum}`;
+                        
+                        img.onload = function() {
+                            img.classList.remove('loading');
+                            
+                            // Set canvas size to match image
+                            const rect = img.getBoundingClientRect();
+                            drawCanvas.width = img.naturalWidth;
+                            drawCanvas.height = img.naturalHeight;
+                            drawCanvas.style.width = img.offsetWidth + "px";
+                            drawCanvas.style.height = img.offsetHeight + "px";
+                            
+                            enableDrawing(drawCanvas, img);
+                        };
+                        
+                        img.onerror = function() {
+                            img.classList.remove('loading');
+                            img.alt = `Error loading page ${pageNum}`;
+                        };
+                        
+                        img.src = imageUrl;
+                        
+                        pageWrapper.appendChild(img);
+                        pageWrapper.appendChild(drawCanvas);
+                        viewer.appendChild(pageWrapper);
+                        
+                        pageWrappers.push(pageWrapper);
+                        drawCanvases.push(drawCanvas);
+                    });
+
+                    // Hide loader
+                    document.getElementById("loader").style.display = "none";
+                    updatePageInfo();
+                    setupNavigation();
+                    setupMenu();
+
+                } catch (err) {
+                    console.error("Error loading PDF images:", err);
+                    document.getElementById("loader").innerText = "Failed to load PDF. Please try again.";
+                }
+            }
+
+            function enableDrawing(canvas, img) {
+                const ctx = canvas.getContext("2d");
+                let drawing = false;
+                let lastX = 0;
+                let lastY = 0;
+
+                function getCoordinates(e) {
+                    const rect = img.getBoundingClientRect();
+                    const scaleX = img.naturalWidth / img.offsetWidth;
+                    const scaleY = img.naturalHeight / img.offsetHeight;
+                    
+                    let clientX, clientY;
+                    if (e.touches && e.touches.length > 0) {
+                        clientX = e.touches[0].clientX;
+                        clientY = e.touches[0].clientY;
+                    } else {
+                        clientX = e.clientX;
+                        clientY = e.clientY;
+                    }
+                    
+                    const x = (clientX - rect.left) * scaleX;
+                    const y = (clientY - rect.top) * scaleY;
+                    
+                    return { x, y };
+                }
+
+                function startDrawing(e) {
+                    if (drawingMode === 'none') return;
+                    drawing = true;
+                    const coords = getCoordinates(e);
+                    lastX = coords.x;
+                    lastY = coords.y;
+                    ctx.beginPath();
+                    ctx.moveTo(lastX, lastY);
+                    e.preventDefault();
+                }
+
+                function draw(e) {
+                    if (!drawing || drawingMode === 'none') return;
+                    
+                    const coords = getCoordinates(e);
+                    
+                    if (drawingMode === 'pen') {
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.strokeStyle = '#ffeb3b';
+                        ctx.lineWidth = 3;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.lineTo(coords.x, coords.y);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(coords.x, coords.y);
+                    } else if (drawingMode === 'eraser') {
+                        ctx.globalCompositeOperation = 'destination-out';
+                        ctx.lineWidth = 20;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.lineTo(coords.x, coords.y);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(coords.x, coords.y);
+                    }
+                    
+                    lastX = coords.x;
+                    lastY = coords.y;
+                    e.preventDefault();
+                }
+
+                function stopDrawing() {
+                    drawing = false;
+                    ctx.beginPath();
+                }
+
+                canvas.addEventListener("mousedown", startDrawing);
+                canvas.addEventListener("mousemove", draw);
+                canvas.addEventListener("mouseup", stopDrawing);
+                canvas.addEventListener("mouseleave", stopDrawing);
+                
+                canvas.addEventListener("touchstart", startDrawing, { passive: false });
+                canvas.addEventListener("touchmove", draw, { passive: false });
+                canvas.addEventListener("touchend", stopDrawing, { passive: false });
+                canvas.addEventListener("touchcancel", stopDrawing, { passive: false });
+            }
+
+            function updateDrawingMode() {
+                drawCanvases.forEach(canvas => {
+                    if (!canvas) return;
+                    canvas.className = "draw-canvas";
+                    if (drawingMode === 'pen') {
+                        canvas.classList.add('pen-mode');
+                        canvas.classList.remove('no-drawing');
+                    } else if (drawingMode === 'eraser') {
+                        canvas.classList.add('eraser-mode');
+                        canvas.classList.remove('no-drawing');
+                    } else {
+                        canvas.classList.add('no-drawing');
+                    }
+                });
+            }
+
+            function scrollToPage(pageNum) {
+                if (pageNum < 1 || pageNum > totalPages) return;
+                
+                const pageElement = document.getElementById(`page-${pageNum}`);
+                if (pageElement) {
+                    pageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    currentPage = pageNum;
+                    updatePageInfo();
+                }
+            }
+
+            function updatePageInfo() {
+                const pageInfo = document.getElementById("pageInfo");
+                if (pageInfo) {
+                    pageInfo.textContent = `Page ${currentPage} / ${totalPages}`;
+                }
+            }
+
+            function setupNavigation() {
+                const nextBtn = document.getElementById("nextBtn");
+                const prevBtn = document.getElementById("prevBtn");
+                const goBtn = document.getElementById("goBtn");
+                const jumpPageInput = document.getElementById("jumpPage");
+
+                if (nextBtn) {
+                    nextBtn.onclick = () => {
+                        if (currentPage < totalPages) {
+                            scrollToPage(currentPage + 1);
+                        }
+                    };
+                }
+
+                if (prevBtn) {
+                    prevBtn.onclick = () => {
+                        if (currentPage > 1) {
+                            scrollToPage(currentPage - 1);
+                        }
+                    };
+                }
+
+                if (goBtn && jumpPageInput) {
+                    goBtn.onclick = () => {
+                        const p = parseInt(jumpPageInput.value);
+                        if (p >= 1 && p <= totalPages) {
+                            scrollToPage(p);
+                            jumpPageInput.value = "";
+                        }
+                    };
+
+                    jumpPageInput.addEventListener("keypress", (e) => {
+                        if (e.key === "Enter") {
+                            const p = parseInt(jumpPageInput.value);
+                            if (p >= 1 && p <= totalPages) {
+                                scrollToPage(p);
+                                jumpPageInput.value = "";
+                            }
+                        }
+                    });
+                }
+            }
+
+            function setupMenu() {
+                const menuToggle = document.getElementById("menuToggle");
+                const menuItems = document.getElementById("menuItems");
+                let menuOpen = false;
+
+                menuToggle.addEventListener("click", () => {
+                    menuOpen = !menuOpen;
+                    menuItems.classList.toggle("active", menuOpen);
+                    menuToggle.classList.toggle("active", menuOpen);
+                    menuToggle.textContent = menuOpen ? "✕" : "☰";
+                });
+
+                document.getElementById("toggleNav").addEventListener("click", () => {
+                    const controls = document.getElementById("controls");
+                    controls.classList.toggle("hidden");
+                    document.getElementById("toggleNav").classList.toggle("active");
+                });
+
+                document.getElementById("penTool").addEventListener("click", () => {
+                    drawingMode = drawingMode === 'pen' ? 'none' : 'pen';
+                    updateDrawingMode();
+                    document.getElementById("penTool").classList.toggle("active", drawingMode === 'pen');
+                    document.getElementById("eraserTool").classList.toggle("active", false);
+                });
+
+                document.getElementById("eraserTool").addEventListener("click", () => {
+                    drawingMode = drawingMode === 'eraser' ? 'none' : 'eraser';
+                    updateDrawingMode();
+                    document.getElementById("eraserTool").classList.toggle("active", drawingMode === 'eraser');
+                    document.getElementById("penTool").classList.toggle("active", false);
+                });
+            }
+
+            // Track current page on scroll
+            let scrollTimeout;
+            document.getElementById("viewerContainer").addEventListener("scroll", () => {
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                    const container = document.getElementById("viewerContainer");
+                    const scrollTop = container.scrollTop;
+                    const containerHeight = container.clientHeight;
+
+                    for (let i = 0; i < pageWrappers.length; i++) {
+                        const wrapper = pageWrappers[i];
+                        const wrapperTop = wrapper.offsetTop - container.scrollTop;
+                        const wrapperBottom = wrapperTop + wrapper.offsetHeight;
+
+                        if (wrapperTop <= containerHeight / 2 && wrapperBottom >= containerHeight / 2) {
+                            currentPage = i + 1;
+                            updatePageInfo();
+                            break;
+                        }
+                    }
+                }, 100);
+            });
+
+            // Initialize iOS viewer
+            loadPdfAsImages();
+        }
+        
+        // ============================================
+        // NON-iOS: PDF.js VIEWER
+        // ============================================
+        else {
+            // Wait for PDF.js to load
+            function waitForPDFJS() {
+                if (typeof pdfjsLib === 'undefined') {
+                    setTimeout(waitForPDFJS, 100);
+                    return;
+                }
+                
+                pdfjsLib.GlobalWorkerOptions.workerSrc =
+                    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+                
+                initializePDFJSViewer();
+            }
+            
+            waitForPDFJS();
+
+            function initializePDFJSViewer() {
+                const url = `${BASE_URL}/Summary/${id}/file`;
+                let pdfDoc = null;
+                let currentPage = 1;
+                let drawingMode = 'none';
+                let drawCanvases = [];
+                let pageWrappers = [];
+
+                function calculateScale() {
+                    const container = document.getElementById("viewerContainer");
+                    let containerWidth = window.innerWidth;
+                    
+                    if (container) {
+                        containerWidth = container.clientWidth;
+                    }
+                    
+                    const padding = window.innerWidth <= 768 ? 20 : 40;
+                    const availableWidth = containerWidth - padding;
+                    const standardPageWidth = 612;
+                    let calculatedScale = availableWidth / standardPageWidth;
+                    
+                    if (window.innerWidth <= 480) {
+                        calculatedScale = Math.min(calculatedScale, 1.0);
+                        calculatedScale = Math.max(calculatedScale, 0.8);
+                    } else if (window.innerWidth <= 768) {
+                        calculatedScale = Math.min(calculatedScale, 1.2);
+                        calculatedScale = Math.max(calculatedScale, 1.0);
+                    } else {
+                        calculatedScale = Math.min(calculatedScale, 1.8);
+                        calculatedScale = Math.max(calculatedScale, 1.5);
+                    }
+                    
+                    return calculatedScale;
+                }
+
+                let scale = calculateScale();
+
+                const loadingTask = pdfjsLib.getDocument({
+                    url: url,
+                    disableAutoFetch: false,
+                    disableStream: false,
+                    disableRange: false
+                });
+
+                loadingTask.onProgress = function (progress) {
+                    if (progress.total) {
+                        const percent = Math.round((progress.loaded / progress.total) * 100);
+                        document.getElementById("percent").innerText = percent + "%";
+                    }
+                };
+
+                loadingTask.promise.then(async (pdf) => {
+                    pdfDoc = pdf;
+                    await renderAllPages();
+                    updateDrawingMode();
+                    setupNavigation();
+                    setupMenu();
+                    document.getElementById("loader").style.display = "none";
+                    updatePageInfo();
+                }).catch(err => {
+                    console.error("PDF.js Error:", err);
+                    document.getElementById("loader").innerText = "Failed to load PDF. Please try again.";
+                });
+
+                async function renderAllPages() {
+                    const viewer = document.getElementById("viewerContainer");
+                    viewer.innerHTML = "";
+                    drawCanvases = [];
+                    pageWrappers = [];
+                    scale = calculateScale();
+
+                    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+                        const page = await pdfDoc.getPage(pageNum);
+                        const viewport = page.getViewport({ scale });
+
+                        const pageWrapper = document.createElement("div");
+                        pageWrapper.className = "page-wrapper";
+                        pageWrapper.id = `page-${pageNum}`;
+
+                        const devicePixelRatio = window.devicePixelRatio || 1;
+                        const outputScale = devicePixelRatio;
+                        
+                        const pdfCanvas = document.createElement("canvas");
+                        pdfCanvas.className = "pdf-canvas";
+                        
+                        pdfCanvas.width = Math.floor(viewport.width * outputScale);
+                        pdfCanvas.height = Math.floor(viewport.height * outputScale);
+                        pdfCanvas.style.width = viewport.width + "px";
+                        pdfCanvas.style.height = viewport.height + "px";
+
+                        const ctx = pdfCanvas.getContext("2d");
+                        ctx.scale(outputScale, outputScale);
+                        
+                        await page.render({
+                            canvasContext: ctx,
+                            viewport: viewport
+                        }).promise;
+
+                        const drawCanvas = document.createElement("canvas");
+                        drawCanvas.className = "draw-canvas";
+                        
+                        drawCanvas.width = Math.floor(viewport.width * outputScale);
+                        drawCanvas.height = Math.floor(viewport.height * outputScale);
+                        drawCanvas.style.width = viewport.width + "px";
+                        drawCanvas.style.height = viewport.height + "px";
+                        
+                        const drawCtx = drawCanvas.getContext("2d");
+                        drawCtx.scale(outputScale, outputScale);
+
+                        pageWrapper.appendChild(pdfCanvas);
+                        pageWrapper.appendChild(drawCanvas);
+                        viewer.appendChild(pageWrapper);
+
+                        drawCanvases.push(drawCanvas);
+                        pageWrappers.push(pageWrapper);
+
+                        enableDrawing(drawCanvas);
+                    }
+                }
+
+                function enableDrawing(canvas) {
+                    const ctx = canvas.getContext("2d");
+                    let drawing = false;
+                    let lastX = 0;
+                    let lastY = 0;
+
+                    function getCoordinates(e) {
+                        const rect = canvas.getBoundingClientRect();
+                        let clientX, clientY;
+                        if (e.touches && e.touches.length > 0) {
+                            clientX = e.touches[0].clientX;
+                            clientY = e.touches[0].clientY;
+                        } else {
+                            clientX = e.clientX;
+                            clientY = e.clientY;
+                        }
+                        const x = clientX - rect.left;
+                        const y = clientY - rect.top;
+                        return { x, y };
+                    }
+
+                    canvas.addEventListener("mousedown", (e) => {
+                        if (drawingMode === 'none') return;
+                        drawing = true;
+                        const coords = getCoordinates(e);
+                        lastX = coords.x;
+                        lastY = coords.y;
+                        ctx.beginPath();
+                        ctx.moveTo(lastX, lastY);
+                    });
+
+                    canvas.addEventListener("mouseup", () => {
+                        drawing = false;
+                        ctx.beginPath();
+                    });
+
+                    canvas.addEventListener("mousemove", (e) => {
+                        if (!drawing || drawingMode === 'none') return;
+                        const coords = getCoordinates(e);
+
+                        if (drawingMode === 'pen') {
+                            ctx.globalCompositeOperation = 'source-over';
+                            ctx.strokeStyle = '#ffeb3b';
+                            ctx.lineWidth = 3;
+                            ctx.lineCap = 'round';
+                            ctx.lineJoin = 'round';
+                            ctx.lineTo(coords.x, coords.y);
+                            ctx.stroke();
+                            ctx.beginPath();
+                            ctx.moveTo(coords.x, coords.y);
+                        } else if (drawingMode === 'eraser') {
+                            ctx.globalCompositeOperation = 'destination-out';
+                            ctx.lineWidth = 20;
+                            ctx.lineCap = 'round';
+                            ctx.lineJoin = 'round';
+                            ctx.lineTo(coords.x, coords.y);
+                            ctx.stroke();
+                            ctx.beginPath();
+                            ctx.moveTo(coords.x, coords.y);
+                        }
+                        lastX = coords.x;
+                        lastY = coords.y;
+                    });
+
+                    canvas.addEventListener("touchstart", (e) => {
+                        if (drawingMode === 'none') return;
+                        e.preventDefault();
+                        drawing = true;
+                        const coords = getCoordinates(e);
+                        lastX = coords.x;
+                        lastY = coords.y;
+                        ctx.beginPath();
+                        ctx.moveTo(lastX, lastY);
+                    }, { passive: false });
+
+                    canvas.addEventListener("touchmove", (e) => {
+                        if (!drawing || drawingMode === 'none') return;
+                        e.preventDefault();
+                        const coords = getCoordinates(e);
+                        // Same drawing logic as mousemove
+                        if (drawingMode === 'pen') {
+                            ctx.globalCompositeOperation = 'source-over';
+                            ctx.strokeStyle = '#ffeb3b';
+                            ctx.lineWidth = 3;
+                            ctx.lineCap = 'round';
+                            ctx.lineJoin = 'round';
+                            ctx.lineTo(coords.x, coords.y);
+                            ctx.stroke();
+                            ctx.beginPath();
+                            ctx.moveTo(coords.x, coords.y);
+                        } else if (drawingMode === 'eraser') {
+                            ctx.globalCompositeOperation = 'destination-out';
+                            ctx.lineWidth = 20;
+                            ctx.lineCap = 'round';
+                            ctx.lineJoin = 'round';
+                            ctx.lineTo(coords.x, coords.y);
+                            ctx.stroke();
+                            ctx.beginPath();
+                            ctx.moveTo(coords.x, coords.y);
+                        }
+                        lastX = coords.x;
+                        lastY = coords.y;
+                    }, { passive: false });
+
+                    canvas.addEventListener("touchend", () => {
+                        drawing = false;
+                        ctx.beginPath();
+                    }, { passive: false });
+                }
+
+                function updateDrawingMode() {
+                    drawCanvases.forEach(canvas => {
+                        if (!canvas) return;
+                        canvas.className = "draw-canvas";
+                        if (drawingMode === 'pen') {
+                            canvas.classList.add('pen-mode');
+                            canvas.classList.remove('no-drawing');
+                        } else if (drawingMode === 'eraser') {
+                            canvas.classList.add('eraser-mode');
+                            canvas.classList.remove('no-drawing');
+                        } else {
+                            canvas.classList.add('no-drawing');
+                        }
+                    });
+                }
+
+                async function scrollToPage(pageNum) {
+                    if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
+                    const pageElement = document.getElementById(`page-${pageNum}`);
+                    if (pageElement) {
+                        pageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        currentPage = pageNum;
+                        updatePageInfo();
+                    }
+                }
+
+                function updatePageInfo() {
+                    const pageInfo = document.getElementById("pageInfo");
+                    if (pageInfo && pdfDoc) {
+                        pageInfo.textContent = `Page ${currentPage} / ${pdfDoc.numPages}`;
+                    }
+                }
+
+                function setupNavigation() {
+                    const nextBtn = document.getElementById("nextBtn");
+                    const prevBtn = document.getElementById("prevBtn");
+                    const goBtn = document.getElementById("goBtn");
+                    const jumpPageInput = document.getElementById("jumpPage");
+
+                    if (nextBtn) {
+                        nextBtn.onclick = () => {
+                            if (pdfDoc && currentPage < pdfDoc.numPages) {
+                                scrollToPage(currentPage + 1);
+                            }
+                        };
+                    }
+
+                    if (prevBtn) {
+                        prevBtn.onclick = () => {
+                            if (pdfDoc && currentPage > 1) {
+                                scrollToPage(currentPage - 1);
+                            }
+                        };
+                    }
+
+                    if (goBtn && jumpPageInput) {
+                        goBtn.onclick = () => {
+                            if (!pdfDoc) return;
+                            const p = parseInt(jumpPageInput.value);
+                            if (p >= 1 && p <= pdfDoc.numPages) {
+                                scrollToPage(p);
+                                jumpPageInput.value = "";
+                            }
+                        };
+
+                        jumpPageInput.addEventListener("keypress", (e) => {
+                            if (e.key === "Enter") {
+                                if (!pdfDoc) return;
+                                const p = parseInt(jumpPageInput.value);
+                                if (p >= 1 && p <= pdfDoc.numPages) {
+                                    scrollToPage(p);
+                                    jumpPageInput.value = "";
+                                }
+                            }
+                        });
+                    }
+                }
+
+                function setupMenu() {
+                    const menuToggle = document.getElementById("menuToggle");
+                    const menuItems = document.getElementById("menuItems");
+                    let menuOpen = false;
+
+                    menuToggle.addEventListener("click", () => {
+                        menuOpen = !menuOpen;
+                        menuItems.classList.toggle("active", menuOpen);
+                        menuToggle.classList.toggle("active", menuOpen);
+                        menuToggle.textContent = menuOpen ? "✕" : "☰";
+                    });
+
+                    document.getElementById("toggleNav").addEventListener("click", () => {
+                        const controls = document.getElementById("controls");
+                        controls.classList.toggle("hidden");
+                        document.getElementById("toggleNav").classList.toggle("active");
+                    });
+
+                    document.getElementById("penTool").addEventListener("click", () => {
+                        drawingMode = drawingMode === 'pen' ? 'none' : 'pen';
+                        updateDrawingMode();
+                        document.getElementById("penTool").classList.toggle("active", drawingMode === 'pen');
+                        document.getElementById("eraserTool").classList.toggle("active", false);
+                    });
+
+                    document.getElementById("eraserTool").addEventListener("click", () => {
+                        drawingMode = drawingMode === 'eraser' ? 'none' : 'eraser';
+                        updateDrawingMode();
+                        document.getElementById("eraserTool").classList.toggle("active", drawingMode === 'eraser');
+                        document.getElementById("penTool").classList.toggle("active", false);
+                    });
+                }
+
+                let scrollTimeout;
+                document.getElementById("viewerContainer").addEventListener("scroll", () => {
+                    clearTimeout(scrollTimeout);
+                    scrollTimeout = setTimeout(() => {
+                        const container = document.getElementById("viewerContainer");
+                        const scrollTop = container.scrollTop;
+                        const containerHeight = container.clientHeight;
+
+                        for (let i = 0; i < pageWrappers.length; i++) {
+                            const wrapper = pageWrappers[i];
+                            const wrapperTop = wrapper.offsetTop - container.scrollTop;
+                            const wrapperBottom = wrapperTop + wrapper.offsetHeight;
+
+                            if (wrapperTop <= containerHeight / 2 && wrapperBottom >= containerHeight / 2) {
+                                currentPage = i + 1;
+                                updatePageInfo();
+                                break;
+                            }
+                        }
+                    }, 100);
+                });
+            }
+        }
+    </script>
+
+</body>
+</html>
+
