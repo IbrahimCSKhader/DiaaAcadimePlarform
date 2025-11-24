@@ -52,31 +52,6 @@
             background: white;
         }
 
-        /* Image-based viewer styles for iOS */
-        .pdf-page-image {
-            margin: 0;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            max-width: 100%;
-            width: 100%;
-            height: auto;
-            display: block;
-            background: white;
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
-            pointer-events: none;
-        }
-
-        .pdf-page-image.loading {
-            min-height: 800px;
-            background: #2a2a2a;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #999;
-        }
-
         .draw-canvas {
             position: absolute;
             top: 0;
@@ -338,33 +313,7 @@
         }
     </style>
 
-    <!-- PDF.js only loaded for non-iOS devices -->
-    <script>
-        // Detect iOS devices reliably
-        function isIOSDevice() {
-            const ua = window.navigator.userAgent.toLowerCase();
-            const isIOS = /iphone|ipad|ipod/.test(ua);
-            const isSafari = /safari/.test(ua) && !/chrome|crios|fxios/.test(ua);
-            const isIOSChrome = /crios/.test(ua);
-            const isIOSFirefox = /fxios/.test(ua);
-            
-            // Also check for touch device and platform
-            const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-            const isIOSPlatform = /iPad|iPhone|iPod/.test(navigator.platform) || 
-                                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-            
-            return (isIOS || isIOSChrome || isIOSFirefox || isIOSPlatform) && hasTouchScreen;
-        }
-        
-        const IS_IOS = isIOSDevice();
-        
-        // Only load PDF.js for non-iOS devices
-        if (!IS_IOS) {
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-            document.head.appendChild(script);
-        }
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 
 <body oncontextmenu="return false">
@@ -403,33 +352,11 @@
     <div id="viewerContainer"></div>
 
     <script>
-        // Prevent download, save, print, and context menu on iOS
         document.onkeydown = function (e) {
             if (e.ctrlKey && ["s", "S", "p", "P", "u", "U"].includes(e.key)) {
                 e.preventDefault();
             }
         };
-
-        // Disable right-click context menu
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            return false;
-        });
-
-        // Disable text selection on iOS
-        if (IS_IOS) {
-            document.addEventListener('selectstart', function(e) {
-                e.preventDefault();
-                return false;
-            });
-            
-            // Disable long-press menu on images
-            document.addEventListener('touchstart', function(e) {
-                if (e.target.tagName === 'IMG') {
-                    e.preventDefault();
-                }
-            }, { passive: false });
-        }
 
         const params = new URLSearchParams(window.location.search);
         const id = params.get("id");
@@ -457,258 +384,11 @@
         }
 
         trackVisit(id);
-
-        // ============================================
-        // iOS IMAGE-BASED VIEWER
-        // ============================================
-        if (IS_IOS) {
-            let totalPages = 0;
-            let currentPage = 1;
-            let pageWrappers = [];
-
-            async function loadPdfAsImages() {
-                try {
-                    // Get total page count
-                    const countResponse = await fetch(`${BASE_URL}/Summary/${id}/pages`);
-                    if (!countResponse.ok) {
-                        throw new Error('Failed to get page count');
-                    }
-                    const pageInfo = await countResponse.json();
-                    totalPages = pageInfo.totalPages || 0;
-
-                    if (totalPages === 0) {
-                        document.getElementById("loader").innerText = "No pages found";
-                        return;
-                    }
-
-                    // Initialize viewer
-                    const viewer = document.getElementById("viewerContainer");
-                    viewer.innerHTML = "";
-                    pageWrappers = [];
-
-                    // Create placeholders for all pages
-                    for (let i = 1; i <= totalPages; i++) {
-                        const pageWrapper = document.createElement("div");
-                        pageWrapper.className = "page-wrapper";
-                        pageWrapper.id = `page-${i}`;
-                        
-                        const img = document.createElement("img");
-                        img.className = "pdf-page-image loading";
-                        img.alt = `Page ${i}`;
-                        img.loading = "lazy";
-                        img.draggable = false;
-                        
-                        // Prevent image download/save
-                        img.oncontextmenu = function(e) { e.preventDefault(); return false; };
-                        img.onselectstart = function(e) { e.preventDefault(); return false; };
-                        
-                        pageWrapper.appendChild(img);
-                        viewer.appendChild(pageWrapper);
-                        pageWrappers.push(pageWrapper);
-                    }
-
-                    // Load first few pages immediately
-                    const initialPages = Math.min(3, totalPages);
-                    for (let i = 1; i <= initialPages; i++) {
-                        await loadPageImage(i);
-                    }
-
-                    // Set up intersection observer for lazy loading
-                    setupImageObserver();
-
-                    // Hide loader
-                    document.getElementById("loader").style.display = "none";
-                    updatePageInfo();
-
-                } catch (err) {
-                    console.error("Error loading PDF images:", err);
-                    document.getElementById("loader").innerText = "Failed to load PDF. Please try again.";
-                }
-            }
-
-            async function loadPageImage(pageNum) {
-                if (pageNum < 1 || pageNum > totalPages) return;
-
-                const pageWrapper = document.getElementById(`page-${pageNum}`);
-                if (!pageWrapper) return;
-
-                const img = pageWrapper.querySelector('img');
-                if (!img || img.src) return; // Already loaded
-
-                try {
-                    const response = await fetch(`${BASE_URL}/Summary/${id}/pages?page=${pageNum}`);
-                    if (!response.ok) {
-                        throw new Error(`Failed to load page ${pageNum}`);
-                    }
-
-                    const blob = await response.blob();
-                    const imageUrl = URL.createObjectURL(blob);
-                    
-                    img.onload = function() {
-                        img.classList.remove('loading');
-                        URL.revokeObjectURL(imageUrl); // Clean up
-                    };
-                    
-                    img.onerror = function() {
-                        img.classList.remove('loading');
-                        img.alt = `Error loading page ${pageNum}`;
-                        URL.revokeObjectURL(imageUrl);
-                    };
-
-                    img.src = imageUrl;
-                } catch (err) {
-                    console.error(`Error loading page ${pageNum}:`, err);
-                    img.classList.remove('loading');
-                    img.alt = `Error loading page ${pageNum}`;
-                }
-            }
-
-            function setupImageObserver() {
-                if (!('IntersectionObserver' in window)) {
-                    // Fallback: load all pages
-                    for (let i = 1; i <= totalPages; i++) {
-                        loadPageImage(i);
-                    }
-                    return;
-                }
-
-                const observer = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            const pageNum = parseInt(entry.target.id.replace('page-', ''));
-                            loadPageImage(pageNum);
-                            
-                            // Also preload adjacent pages
-                            if (pageNum > 1) loadPageImage(pageNum - 1);
-                            if (pageNum < totalPages) loadPageImage(pageNum + 1);
-                        }
-                    });
-                }, {
-                    rootMargin: '300px' // Start loading 300px before page comes into view
-                });
-
-                pageWrappers.forEach(wrapper => {
-                    observer.observe(wrapper);
-                });
-            }
-
-            function scrollToPage(pageNum) {
-                if (pageNum < 1 || pageNum > totalPages) return;
-                
-                // Ensure page is loaded
-                loadPageImage(pageNum);
-                
-                const pageElement = document.getElementById(`page-${pageNum}`);
-                if (pageElement) {
-                    pageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    currentPage = pageNum;
-                    updatePageInfo();
-                }
-            }
-
-            function updatePageInfo() {
-                const pageInfo = document.getElementById("pageInfo");
-                if (pageInfo) {
-                    pageInfo.textContent = `Page ${currentPage} / ${totalPages}`;
-                }
-            }
-
-            function setupNavigation() {
-                const nextBtn = document.getElementById("nextBtn");
-                const prevBtn = document.getElementById("prevBtn");
-                const goBtn = document.getElementById("goBtn");
-                const jumpPageInput = document.getElementById("jumpPage");
-
-                if (nextBtn) {
-                    nextBtn.onclick = () => {
-                        if (currentPage < totalPages) {
-                            scrollToPage(currentPage + 1);
-                        }
-                    };
-                }
-
-                if (prevBtn) {
-                    prevBtn.onclick = () => {
-                        if (currentPage > 1) {
-                            scrollToPage(currentPage - 1);
-                        }
-                    };
-                }
-
-                if (goBtn && jumpPageInput) {
-                    goBtn.onclick = () => {
-                        const p = parseInt(jumpPageInput.value);
-                        if (p >= 1 && p <= totalPages) {
-                            scrollToPage(p);
-                            jumpPageInput.value = "";
-                        }
-                    };
-
-                    jumpPageInput.addEventListener("keypress", (e) => {
-                        if (e.key === "Enter") {
-                            const p = parseInt(jumpPageInput.value);
-                            if (p >= 1 && p <= totalPages) {
-                                scrollToPage(p);
-                                jumpPageInput.value = "";
-                            }
-                        }
-                    });
-                }
-            }
-
-            // Track current page on scroll
-            let scrollTimeout;
-            document.getElementById("viewerContainer").addEventListener("scroll", () => {
-                clearTimeout(scrollTimeout);
-                scrollTimeout = setTimeout(() => {
-                    const container = document.getElementById("viewerContainer");
-                    const scrollTop = container.scrollTop;
-                    const containerHeight = container.clientHeight;
-
-                    for (let i = 0; i < pageWrappers.length; i++) {
-                        const wrapper = pageWrappers[i];
-                        const wrapperTop = wrapper.offsetTop - container.scrollTop;
-                        const wrapperBottom = wrapperTop + wrapper.offsetHeight;
-
-                        if (wrapperTop <= containerHeight / 2 && wrapperBottom >= containerHeight / 2) {
-                            currentPage = i + 1;
-                            updatePageInfo();
-                            break;
-                        }
-                    }
-                }, 100);
-            });
-
-            // Initialize
-            setupNavigation();
-            loadPdfAsImages();
-
-            // Hide drawing tools menu on iOS (not needed for images)
-            document.getElementById("optionsMenu").style.display = "none";
-        }
         
-        // ============================================
-        // NON-iOS: PDF.js VIEWER (Original Code)
-        // ============================================
-        else {
-            // Wait for PDF.js to load
-            function waitForPDFJS() {
-                if (typeof pdfjsLib === 'undefined') {
-                    setTimeout(waitForPDFJS, 100);
-                    return;
-                }
-                
-                pdfjsLib.GlobalWorkerOptions.workerSrc =
-                    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-                
-                initializePDFJSViewer();
-            }
-            
-            waitForPDFJS();
-        }
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-        function initializePDFJSViewer() {
-            function calculateScale() {
+        function calculateScale() {
             const container = document.getElementById("viewerContainer");
             let containerWidth = window.innerWidth;
             
@@ -737,47 +417,201 @@
             }
             
             return calculatedScale;
+        }
+
+        // Detect iOS Safari
+        const isIOSSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        
+        let scale = calculateScale();
+        let pdfDoc = null;
+        let currentPage = 1;
+        let drawingMode = 'none';
+        let drawCanvases = [];
+        let pageWrappers = [];
+        let renderedPages = new Map(); // Track which pages are rendered
+        let pagePromises = new Map(); // Track page rendering promises
+        
+        // Reduce memory usage on iOS
+        const maxPixelRatio = isIOSSafari ? 1.5 : (window.devicePixelRatio || 1);
+        
+        const loadingTask = pdfjsLib.getDocument({
+            url: url,
+            disableAutoFetch: false,
+            disableStream: false,
+            disableRange: false,
+            // Add memory optimizations for iOS
+            maxImageSize: isIOSSafari ? 1024 * 1024 : Infinity,
+            isEvalSupported: false
+        });
+
+        loadingTask.onProgress = function (progress) {
+            if (progress.total) {
+                const percent = Math.round((progress.loaded / progress.total) * 100);
+                document.getElementById("percent").innerText = percent + "%";
+            }
+        };
+
+        loadingTask.promise.then(async (pdf) => {
+            pdfDoc = pdf;
+            // On iOS, use lazy loading instead of rendering all pages
+            if (isIOSSafari) {
+                await initializeLazyLoading();
+            } else {
+                await renderAllPages();
+            }
+            updateDrawingMode();
+            setupNavigation();
+            document.getElementById("loader").style.display = "none";
+            updatePageInfo();
+        }).catch(err => {
+            console.error("PDF.js Error:", err);
+            document.getElementById("loader").innerText = "Failed to load PDF. Please try again.";
+            // Show user-friendly error
+            if (err.name === 'RenderingCancelledException' || err.message.includes('memory')) {
+                document.getElementById("loader").innerHTML = 
+                    "PDF is too large for this device. Try a smaller file or use a desktop browser.";
+            }
+        });
+
+        // Initialize lazy loading - create placeholders for all pages
+        async function initializeLazyLoading() {
+            const viewer = document.getElementById("viewerContainer");
+            viewer.innerHTML = "";
+            drawCanvases = [];
+            pageWrappers = [];
+            renderedPages.clear();
+            pagePromises.clear();
+
+            scale = calculateScale();
+
+            // Create placeholders for all pages
+            for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+                const pageWrapper = document.createElement("div");
+                pageWrapper.className = "page-wrapper";
+                pageWrapper.id = `page-${pageNum}`;
+                pageWrapper.style.minHeight = "800px"; // Placeholder height
+                pageWrapper.innerHTML = '<div style="text-align:center;padding:50px;color:#999;">Loading page ' + pageNum + '...</div>';
+                viewer.appendChild(pageWrapper);
+                pageWrappers.push(pageWrapper);
             }
 
-                let scale = calculateScale();
-            let pdfDoc = null;
-            let currentPage = 1;
-            let drawingMode = 'none';
-            let drawCanvases = [];
-            let pageWrappers = [];
-        
-            const loadingTask = pdfjsLib.getDocument({
-                url: url,
-                disableAutoFetch: false,
-                disableStream: false,
-                disableRange: false
+            // Render first few pages immediately
+            const initialPages = Math.min(3, pdfDoc.numPages);
+            for (let i = 1; i <= initialPages; i++) {
+                await renderPage(i);
+            }
+
+            // Set up intersection observer for lazy loading
+            setupIntersectionObserver();
+        }
+
+        // Render a single page
+        async function renderPage(pageNum) {
+            if (renderedPages.has(pageNum)) {
+                return; // Already rendered
+            }
+
+            // Check if already rendering
+            if (pagePromises.has(pageNum)) {
+                return pagePromises.get(pageNum);
+            }
+
+            const renderPromise = (async () => {
+                try {
+                    const page = await pdfDoc.getPage(pageNum);
+                    const viewport = page.getViewport({ scale });
+
+                    const pageWrapper = document.getElementById(`page-${pageNum}`);
+                    if (!pageWrapper) return;
+
+                    // Clear placeholder
+                    pageWrapper.innerHTML = "";
+                    pageWrapper.style.minHeight = "";
+
+                    // Use reduced pixel ratio on iOS to save memory
+                    const outputScale = isIOSSafari ? Math.min(maxPixelRatio, 1.5) : (window.devicePixelRatio || 1);
+                    
+                    const pdfCanvas = document.createElement("canvas");
+                    pdfCanvas.className = "pdf-canvas";
+                    
+                    pdfCanvas.width = Math.floor(viewport.width * outputScale);
+                    pdfCanvas.height = Math.floor(viewport.height * outputScale);
+                    pdfCanvas.style.width = viewport.width + "px";
+                    pdfCanvas.style.height = viewport.height + "px";
+
+                    const ctx = pdfCanvas.getContext("2d");
+                    ctx.scale(outputScale, outputScale);
+                    
+                    await page.render({
+                        canvasContext: ctx,
+                        viewport: viewport
+                    }).promise;
+
+                    const drawCanvas = document.createElement("canvas");
+                    drawCanvas.className = "draw-canvas";
+                    
+                    drawCanvas.width = Math.floor(viewport.width * outputScale);
+                    drawCanvas.height = Math.floor(viewport.height * outputScale);
+                    drawCanvas.style.width = viewport.width + "px";
+                    drawCanvas.style.height = viewport.height + "px";
+                    
+                    const drawCtx = drawCanvas.getContext("2d");
+                    drawCtx.scale(outputScale, outputScale);
+
+                    pageWrapper.appendChild(pdfCanvas);
+                    pageWrapper.appendChild(drawCanvas);
+
+                    const drawCanvasIndex = pageNum - 1;
+                    if (drawCanvases[drawCanvasIndex]) {
+                        drawCanvases[drawCanvasIndex] = drawCanvas;
+                    } else {
+                        drawCanvases[drawCanvasIndex] = drawCanvas;
+                    }
+
+                    enableDrawing(drawCanvas);
+                    renderedPages.set(pageNum, true);
+                } catch (err) {
+                    console.error(`Error rendering page ${pageNum}:`, err);
+                    const pageWrapper = document.getElementById(`page-${pageNum}`);
+                    if (pageWrapper) {
+                        pageWrapper.innerHTML = '<div style="text-align:center;padding:50px;color:#f00;">Error loading page ' + pageNum + '</div>';
+                    }
+                } finally {
+                    pagePromises.delete(pageNum);
+                }
+            })();
+
+            pagePromises.set(pageNum, renderPromise);
+            return renderPromise;
+        }
+
+        // Set up intersection observer for lazy loading
+        function setupIntersectionObserver() {
+            if (!('IntersectionObserver' in window)) {
+                // Fallback: render all pages if IntersectionObserver not supported
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+                    renderPage(i);
+                }
+                return;
+            }
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const pageNum = parseInt(entry.target.id.replace('page-', ''));
+                        renderPage(pageNum);
+                    }
+                });
+            }, {
+                rootMargin: '200px' // Start loading 200px before page comes into view
             });
 
-            loadingTask.onProgress = function (progress) {
-                if (progress.total) {
-                    const percent = Math.round((progress.loaded / progress.total) * 100);
-                    document.getElementById("percent").innerText = percent + "%";
-                }
-            };
-
-            loadingTask.promise.then(async (pdf) => {
-                pdfDoc = pdf;
-                await renderAllPages();
-                updateDrawingMode();
-                setupNavigation();
-                document.getElementById("loader").style.display = "none";
-                updatePageInfo();
-            }).catch(err => {
-                console.error("PDF.js Error:", err);
-                document.getElementById("loader").innerText = "Failed to load PDF. Please try again.";
-                // Show user-friendly error
-                if (err.name === 'RenderingCancelledException' || err.message.includes('memory')) {
-                    document.getElementById("loader").innerHTML = 
-                        "PDF is too large for this device. Try a smaller file or use a desktop browser.";
-                }
+            pageWrappers.forEach(wrapper => {
+                observer.observe(wrapper);
             });
+        }
 
-            async function renderAllPages() {
+        async function renderAllPages() {
             const viewer = document.getElementById("viewerContainer");
             viewer.innerHTML = "";
             drawCanvases = [];
@@ -793,8 +627,8 @@
                 pageWrapper.className = "page-wrapper";
                 pageWrapper.id = `page-${pageNum}`;
 
-                const devicePixelRatio = window.devicePixelRatio || 1;
-                const outputScale = devicePixelRatio;
+                // Use reduced pixel ratio on iOS to save memory
+                const outputScale = isIOSSafari ? Math.min(maxPixelRatio, 1.5) : (window.devicePixelRatio || 1);
                 
                 const pdfCanvas = document.createElement("canvas");
                 pdfCanvas.className = "pdf-canvas";
@@ -989,11 +823,12 @@
                 ctx.beginPath();
             }
 
-            // Touch event handlers for non-iOS devices
-            canvas.addEventListener("touchstart", handleTouchStart, { passive: false, capture: true });
-            canvas.addEventListener("touchmove", handleTouchMove, { passive: false, capture: true });
-            canvas.addEventListener("touchend", handleTouchEnd, { passive: false, capture: true });
-            canvas.addEventListener("touchcancel", handleTouchCancel, { passive: false, capture: true });
+            // Optimize touch events for iOS Safari
+            const touchOptions = isIOSSafari ? { passive: false } : { passive: false, capture: true };
+            canvas.addEventListener("touchstart", handleTouchStart, touchOptions);
+            canvas.addEventListener("touchmove", handleTouchMove, touchOptions);
+            canvas.addEventListener("touchend", handleTouchEnd, touchOptions);
+            canvas.addEventListener("touchcancel", handleTouchCancel, touchOptions);
         }
 
         function updateDrawingMode() {
@@ -1012,58 +847,66 @@
             });
         }
 
-            async function scrollToPage(pageNum) {
-                if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) {
-                    return;
-                }
+        async function scrollToPage(pageNum) {
+            if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) {
+                return;
+            }
+            
+            // Ensure page is rendered before scrolling (important for lazy loading)
+            if (isIOSSafari && !renderedPages.has(pageNum)) {
+                await renderPage(pageNum);
+                // Also render adjacent pages
+                if (pageNum > 1) await renderPage(pageNum - 1);
+                if (pageNum < pdfDoc.numPages) await renderPage(pageNum + 1);
+            }
+            
+            const pageElement = document.getElementById(`page-${pageNum}`);
+            if (pageElement) {
+                const container = document.getElementById("viewerContainer");
+                const containerRect = container.getBoundingClientRect();
+                const elementRect = pageElement.getBoundingClientRect();
+                const scrollTop = container.scrollTop + (elementRect.top - containerRect.top) - (containerRect.height / 2) + (elementRect.height / 2);
                 
-                const pageElement = document.getElementById(`page-${pageNum}`);
-                if (pageElement) {
-                    const container = document.getElementById("viewerContainer");
-                    const containerRect = container.getBoundingClientRect();
-                    const elementRect = pageElement.getBoundingClientRect();
-                    const scrollTop = container.scrollTop + (elementRect.top - containerRect.top) - (containerRect.height / 2) + (elementRect.height / 2);
-                    
-                    container.scrollTo({
-                        top: scrollTop,
-                        behavior: 'smooth'
-                    });
-                    
-                    currentPage = pageNum;
-                    updatePageInfo();
-                }
+                container.scrollTo({
+                    top: scrollTop,
+                    behavior: 'smooth'
+                });
+                
+                currentPage = pageNum;
+                updatePageInfo();
             }
+        }
 
-            function updatePageInfo() {
-                const pageInfo = document.getElementById("pageInfo");
-                if (pageInfo && pdfDoc) {
-                    pageInfo.textContent = `Page ${currentPage} / ${pdfDoc.numPages}`;
-                }
+        function updatePageInfo() {
+            const pageInfo = document.getElementById("pageInfo");
+            if (pageInfo && pdfDoc) {
+                pageInfo.textContent = `Page ${currentPage} / ${pdfDoc.numPages}`;
             }
+        }
 
-            let scrollTimeout;
-            document.getElementById("viewerContainer").addEventListener("scroll", () => {
-                clearTimeout(scrollTimeout);
-                scrollTimeout = setTimeout(() => {
-                    const container = document.getElementById("viewerContainer");
-                    const scrollTop = container.scrollTop;
-                    const containerHeight = container.clientHeight;
+        let scrollTimeout;
+        document.getElementById("viewerContainer").addEventListener("scroll", () => {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                const container = document.getElementById("viewerContainer");
+                const scrollTop = container.scrollTop;
+                const containerHeight = container.clientHeight;
 
-                    for (let i = 0; i < pageWrappers.length; i++) {
-                        const wrapper = pageWrappers[i];
-                        const wrapperTop = wrapper.offsetTop - container.scrollTop;
-                        const wrapperBottom = wrapperTop + wrapper.offsetHeight;
+                for (let i = 0; i < pageWrappers.length; i++) {
+                    const wrapper = pageWrappers[i];
+                    const wrapperTop = wrapper.offsetTop - container.scrollTop;
+                    const wrapperBottom = wrapperTop + wrapper.offsetHeight;
 
-                        if (wrapperTop <= containerHeight / 2 && wrapperBottom >= containerHeight / 2) {
-                            currentPage = i + 1;
-                            updatePageInfo();
-                            break;
-                        }
+                    if (wrapperTop <= containerHeight / 2 && wrapperBottom >= containerHeight / 2) {
+                        currentPage = i + 1;
+                        updatePageInfo();
+                        break;
                     }
-                }, 100);
-            });
+                }
+            }, 100);
+        });
 
-            function setupNavigation() {
+        function setupNavigation() {
             const nextBtn = document.getElementById("nextBtn");
             const prevBtn = document.getElementById("prevBtn");
             const goBtn = document.getElementById("goBtn");
@@ -1108,73 +951,80 @@
             }
         }
 
-            setupNavigation();
+        setupNavigation();
 
-            const menuToggle = document.getElementById("menuToggle");
-            const menuItems = document.getElementById("menuItems");
-            let menuOpen = false;
+        const menuToggle = document.getElementById("menuToggle");
+        const menuItems = document.getElementById("menuItems");
+        let menuOpen = false;
 
-            menuToggle.addEventListener("click", () => {
-                menuOpen = !menuOpen;
-                menuItems.classList.toggle("active", menuOpen);
-                menuToggle.classList.toggle("active", menuOpen);
-                menuToggle.textContent = menuOpen ? "✕" : "☰";
-            });
+        menuToggle.addEventListener("click", () => {
+            menuOpen = !menuOpen;
+            menuItems.classList.toggle("active", menuOpen);
+            menuToggle.classList.toggle("active", menuOpen);
+            menuToggle.textContent = menuOpen ? "✕" : "☰";
+        });
 
-            document.getElementById("toggleNav").addEventListener("click", () => {
-                const controls = document.getElementById("controls");
-                controls.classList.toggle("hidden");
-                document.getElementById("toggleNav").classList.toggle("active");
-            });
+        document.getElementById("toggleNav").addEventListener("click", () => {
+            const controls = document.getElementById("controls");
+            controls.classList.toggle("hidden");
+            document.getElementById("toggleNav").classList.toggle("active");
+        });
 
-            document.getElementById("penTool").addEventListener("click", () => {
-                drawingMode = drawingMode === 'pen' ? 'none' : 'pen';
-                updateDrawingMode();
-                document.getElementById("penTool").classList.toggle("active", drawingMode === 'pen');
-                document.getElementById("eraserTool").classList.toggle("active", false);
-            });
+        document.getElementById("penTool").addEventListener("click", () => {
+            drawingMode = drawingMode === 'pen' ? 'none' : 'pen';
+            updateDrawingMode();
+            document.getElementById("penTool").classList.toggle("active", drawingMode === 'pen');
+            document.getElementById("eraserTool").classList.toggle("active", false);
+        });
 
-            document.getElementById("eraserTool").addEventListener("click", () => {
-                drawingMode = drawingMode === 'eraser' ? 'none' : 'eraser';
-                updateDrawingMode();
-                document.getElementById("eraserTool").classList.toggle("active", drawingMode === 'eraser');
-                document.getElementById("penTool").classList.toggle("active", false);
-            });
+        document.getElementById("eraserTool").addEventListener("click", () => {
+            drawingMode = drawingMode === 'eraser' ? 'none' : 'eraser';
+            updateDrawingMode();
+            document.getElementById("eraserTool").classList.toggle("active", drawingMode === 'eraser');
+            document.getElementById("penTool").classList.toggle("active", false);
+        });
 
-            let resizeTimeout;
-            let lastWidth = window.innerWidth;
-            let lastHeight = window.innerHeight;
+        let resizeTimeout;
+        let lastWidth = window.innerWidth;
+        let lastHeight = window.innerHeight;
+        
+        function handleResize() {
+            const currentWidth = window.innerWidth;
+            const currentHeight = window.innerHeight;
+            const widthDiff = Math.abs(currentWidth - lastWidth);
+            const heightDiff = Math.abs(currentHeight - lastHeight);
             
-            function handleResize() {
-                const currentWidth = window.innerWidth;
-                const currentHeight = window.innerHeight;
-                const widthDiff = Math.abs(currentWidth - lastWidth);
-                const heightDiff = Math.abs(currentHeight - lastHeight);
-                
-                if (widthDiff < 50 && heightDiff < 50) {
-                    return;
-                }
-                
-                lastWidth = currentWidth;
-                lastHeight = currentHeight;
-                
-                clearTimeout(resizeTimeout);
-                resizeTimeout = setTimeout(() => {
-                    if (pdfDoc) {
-                        const oldScale = scale;
-                        scale = calculateScale();
-                        if (Math.abs(oldScale - scale) > 0.1) {
+            if (widthDiff < 50 && heightDiff < 50) {
+                return;
+            }
+            
+            lastWidth = currentWidth;
+            lastHeight = currentHeight;
+            
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (pdfDoc) {
+                    const oldScale = scale;
+                    scale = calculateScale();
+                    if (Math.abs(oldScale - scale) > 0.1) {
+                        // On iOS, reinitialize lazy loading instead of rendering all
+                        if (isIOSSafari) {
+                            initializeLazyLoading().then(() => {
+                                updateDrawingMode();
+                                updatePageInfo();
+                            });
+                        } else {
                             renderAllPages();
                             updatePageInfo();
                         }
                     }
-                }, 800);
-            }
-            
-            // Enable resize handler for non-iOS devices
-            if (window.innerWidth > 768) {
-                window.addEventListener("resize", handleResize);
-            }
+                }
+            }, 800);
+        }
+        
+        // Only enable resize handler on larger screens or non-iOS devices
+        if (window.innerWidth > 768 || !isIOSSafari) {
+            window.addEventListener("resize", handleResize);
         }
 
     </script>
