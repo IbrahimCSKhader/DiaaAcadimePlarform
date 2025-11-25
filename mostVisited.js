@@ -16,7 +16,7 @@ fetch(apiUrl)
                     <i class="fas fa-eye"></i>
                     <span>${viewCount}</span>
                 </div>
-                <a href="view-pdf.html?id=${item.id}" class="view-button">عرض الملف</a>
+                <a target="_blank" href="view-pdf.html?id=${item.id}" class="view-button">عرض الملف</a>
             `;
 
       container.appendChild(card);
