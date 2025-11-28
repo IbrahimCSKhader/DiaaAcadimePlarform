@@ -79,8 +79,7 @@
             -webkit-overflow-scrolling: touch;
             /* Ensure content is visible */
             display: block;
-            /* Increase margin when zoomed to prevent overlap */
-            margin: 30px 0;
+            /* Margin will be set dynamically via JavaScript */
         }
 
         /* Ensure text layer is selectable */
@@ -1155,9 +1154,13 @@
                     pageWrapper.style.width = (viewport.width * currentZoomFactor) + "px";
                     pageWrapper.style.minWidth = (viewport.width * currentZoomFactor) + "px";
                     pageWrapper.style.maxWidth = "none";
-                    // Increase margin to prevent pages from overlapping
-                    pageWrapper.style.marginTop = (15 * currentZoomFactor) + "px";
-                    pageWrapper.style.marginBottom = (15 * currentZoomFactor) + "px";
+                    // Calculate proper margin to prevent overlap
+                    const baseMargin = 15;
+                    const extraMargin = (currentZoomFactor - 1) * 30; // Extra spacing when zoomed
+                    const totalMargin = baseMargin + extraMargin;
+                    
+                    pageWrapper.style.marginTop = totalMargin + "px";
+                    pageWrapper.style.marginBottom = totalMargin + "px";
                 } else {
                     pageWrapper.style.width = "";
                     pageWrapper.style.minWidth = "";
@@ -1659,9 +1662,20 @@
                                 wrapper.style.minWidth = (baseWidth * zoomFactor) + "px";
                                 wrapper.style.maxWidth = "none";
                             }
-                            // Increase margin to prevent pages from overlapping
-                            wrapper.style.marginTop = (15 * zoomFactor) + "px";
-                            wrapper.style.marginBottom = (15 * zoomFactor) + "px";
+                            
+                            // Calculate proper margin to prevent overlap
+                            // Margin should account for the scaled height difference
+                            const baseMargin = 15;
+                            // Add extra margin based on zoom level to prevent overlap
+                            const extraMargin = (zoomFactor - 1) * 30; // Extra spacing when zoomed
+                            const totalMargin = baseMargin + extraMargin;
+                            
+                            wrapper.style.marginTop = totalMargin + "px";
+                            wrapper.style.marginBottom = totalMargin + "px";
+                            
+                            // Also add padding to ensure separation
+                            wrapper.style.paddingTop = "0px";
+                            wrapper.style.paddingBottom = "0px";
                         } else {
                             wrapper.classList.remove("zoomed");
                             wrapper.style.width = "";
@@ -1669,6 +1683,8 @@
                             wrapper.style.maxWidth = "100%";
                             wrapper.style.marginTop = "";
                             wrapper.style.marginBottom = "";
+                            wrapper.style.paddingTop = "";
+                            wrapper.style.paddingBottom = "";
                         }
                     }
                 });
