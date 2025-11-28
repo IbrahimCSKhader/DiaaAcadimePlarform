@@ -1537,69 +1537,115 @@
         // ============================================
         // ZOOM CONTROLS
         // ============================================
-        function applyZoom(newZoom) {
+        // Smooth zoom animation
+        let zoomAnimationFrame = null;
+        let targetZoomLevel = 100;
+        
+        function applyZoom(newZoom, animate = true, centerX = null, centerY = null) {
             // Enhanced zoom limits for high resolution
-            const maxZoom = isIOSSafari ? 200 : 400; // Increased from 150/300
+            const maxZoom = isIOSSafari ? 200 : 400;
             const minZoom = isIOSSafari ? 75 : 50;
             
-            zoomLevel = Math.max(minZoom, Math.min(maxZoom, newZoom));
+            targetZoomLevel = Math.max(minZoom, Math.min(maxZoom, newZoom));
+            
+            // Cancel any ongoing animation
+            if (zoomAnimationFrame) {
+                cancelAnimationFrame(zoomAnimationFrame);
+            }
             
             // Keep scale constant - only change CSS transform for zoom
-            // This keeps page size constant while zooming content
             scale = baseScale; // Always use baseScale for rendering
             
-            // Update zoom level display
-            const zoomLevelEl = document.getElementById("zoomLevel");
-            if (zoomLevelEl) {
-                zoomLevelEl.textContent = Math.round(zoomLevel) + "%";
-            }
-            
-            // Update slider
-            updateZoomSlider();
-            
-            // Check if zoomed (more than 100%)
-            const isZoomed = zoomLevel > 100;
             const container = document.getElementById("viewerContainer");
+            const startZoom = zoomLevel;
+            const zoomDiff = targetZoomLevel - startZoom;
+            const startTime = performance.now();
+            const duration = animate ? 200 : 0; // 200ms smooth animation
             
-            // Enable/disable horizontal scroll based on zoom level
-            if (isZoomed) {
-                container.classList.add("zoomed");
-            } else {
-                container.classList.remove("zoomed");
+            function animateZoom(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Easing function for smooth zoom (ease-out)
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                
+                zoomLevel = startZoom + (zoomDiff * easeOut);
+                
+                // Update zoom level display
+                const zoomLevelEl = document.getElementById("zoomLevel");
+                if (zoomLevelEl) {
+                    zoomLevelEl.textContent = Math.round(zoomLevel) + "%";
+                }
+                
+                // Update slider
+                updateZoomSlider();
+                
+                // Check if zoomed (more than 100%)
+                const isZoomed = zoomLevel > 100;
+                
+                // Enable/disable horizontal scroll based on zoom level
+                if (isZoomed) {
+                    container.classList.add("zoomed");
+                } else {
+                    container.classList.remove("zoomed");
+                }
+                
+                // Apply CSS transform to all page wrappers
+                const zoomFactor = zoomLevel / 100;
+                pageWrappers.forEach((wrapper, pageNum) => {
+                    if (wrapper) {
+                        // Apply transform to zoom content without changing page size
+                        wrapper.style.transform = `scale(${zoomFactor})`;
+                        wrapper.style.transformOrigin = centerX !== null && centerY !== null ? `${centerX}px ${centerY}px` : "center top";
+                        
+                        // Enable horizontal scroll on page wrapper when zoomed
+                        if (isZoomed) {
+                            wrapper.classList.add("zoomed");
+                            const baseWidth = parseFloat(wrapper.dataset.baseWidth || "0");
+                            if (baseWidth > 0) {
+                                wrapper.style.minWidth = (baseWidth * zoomFactor) + "px";
+                            }
+                        } else {
+                            wrapper.classList.remove("zoomed");
+                            wrapper.style.minWidth = "";
+                        }
+                        
+                        // Store base dimensions if not already stored
+                        if (!wrapper.dataset.baseWidth) {
+                            const currentWidth = wrapper.offsetWidth;
+                            const currentHeight = wrapper.offsetHeight;
+                            const currentScale = wrapper.style.transform ? parseFloat(wrapper.style.transform.match(/scale\(([^)]+)\)/)?.[1] || 1) : 1;
+                            wrapper.dataset.baseWidth = (currentWidth / currentScale) + "";
+                            wrapper.dataset.baseHeight = (currentHeight / currentScale) + "";
+                        }
+                    }
+                });
+                
+                // Adjust scroll position if center point is provided
+                if (centerX !== null && centerY !== null && progress > 0) {
+                    const zoomFactorChange = zoomLevel / startZoom;
+                    const containerRect = container.getBoundingClientRect();
+                    const relativeX = centerX - containerRect.left + container.scrollLeft;
+                    const relativeY = centerY - containerRect.top + container.scrollTop;
+                    
+                    container.scrollLeft = relativeX - (relativeX - container.scrollLeft) * zoomFactorChange;
+                    container.scrollTop = relativeY - (relativeY - container.scrollTop) * zoomFactorChange;
+                }
+                
+                if (progress < 1) {
+                    zoomAnimationFrame = requestAnimationFrame(animateZoom);
+                } else {
+                    zoomLevel = targetZoomLevel; // Ensure final value
+                    zoomAnimationFrame = null;
+                }
             }
             
-            // Apply CSS transform to all page wrappers instead of re-rendering
-            const zoomFactor = zoomLevel / 100;
-            pageWrappers.forEach((wrapper, pageNum) => {
-                if (wrapper) {
-                    // Apply transform to zoom content without changing page size
-                    wrapper.style.transform = `scale(${zoomFactor})`;
-                    wrapper.style.transformOrigin = "center top";
-                    
-                    // Enable horizontal scroll on page wrapper when zoomed
-                    if (isZoomed) {
-                        wrapper.classList.add("zoomed");
-                        // Get base width from dataset or calculate it
-                        const baseWidth = parseFloat(wrapper.dataset.baseWidth || "0");
-                        if (baseWidth > 0) {
-                            // Set min-width to allow horizontal scrolling
-                            wrapper.style.minWidth = (baseWidth * zoomFactor) + "px";
-                        }
-                    } else {
-                        wrapper.classList.remove("zoomed");
-                        wrapper.style.minWidth = "";
-                    }
-                    
-                    // Keep wrapper size constant - store base dimensions
-                    if (!wrapper.dataset.baseWidth) {
-                        const currentWidth = wrapper.offsetWidth;
-                        const currentHeight = wrapper.offsetHeight;
-                        const currentScale = wrapper.style.transform ? parseFloat(wrapper.style.transform.match(/scale\(([^)]+)\)/)?.[1] || 1) : 1;
-                        wrapper.dataset.baseWidth = (currentWidth / currentScale) + "";
-                        wrapper.dataset.baseHeight = (currentHeight / currentScale) + "";
-                    }
-                }
-            });
+            if (animate && duration > 0) {
+                zoomAnimationFrame = requestAnimationFrame(animateZoom);
+            } else {
+                zoomLevel = targetZoomLevel;
+                animateZoom(performance.now());
+            }
         }
 
         // Zoom slider control - now in menu
@@ -1615,10 +1661,28 @@
                 // Set initial value
                 zoomSlider.value = zoomLevel;
                 
-                // Zoom slider input
+                // Zoom slider input with smooth updates
+                let sliderTimeout = null;
                 zoomSlider.addEventListener("input", (e) => {
                     const newZoom = parseInt(e.target.value);
-                    applyZoom(newZoom);
+                    
+                    // Update display immediately for responsive feedback
+                    if (zoomLevelDisplay) {
+                        zoomLevelDisplay.textContent = newZoom + "%";
+                    }
+                    
+                    // Throttle zoom application for smooth slider experience
+                    clearTimeout(sliderTimeout);
+                    sliderTimeout = setTimeout(() => {
+                        applyZoom(newZoom, true);
+                    }, 50); // Small delay for smooth slider feel
+                });
+                
+                // Apply zoom on slider release for final value
+                zoomSlider.addEventListener("change", (e) => {
+                    clearTimeout(sliderTimeout);
+                    const newZoom = parseInt(e.target.value);
+                    applyZoom(newZoom, true);
                 });
             }
         }
@@ -2013,39 +2077,40 @@
         const DOUBLE_TAP_DELAY = 300;
         const DOUBLE_TAP_DISTANCE = 50; // Max distance between taps
 
+        // Smart zoom levels for better UX
+        const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200, 250, 300, 400];
+        
+        function getNextZoomLevel(currentZoom, direction = 'in') {
+            if (direction === 'in') {
+                return ZOOM_LEVELS.find(level => level > currentZoom) || ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+            } else {
+                return [...ZOOM_LEVELS].reverse().find(level => level < currentZoom) || ZOOM_LEVELS[0];
+            }
+        }
+        
         function handleDoubleTap(x, y) {
             const container = document.getElementById("viewerContainer");
             const containerRect = container.getBoundingClientRect();
             
-            // Convert tap position to container coordinates
-            const relativeX = x - containerRect.left + container.scrollLeft;
-            const relativeY = y - containerRect.top + container.scrollTop;
-            
-            // Comfortable zoom level (200% for reading)
-            const targetZoom = zoomLevel === 100 ? 200 : 100;
-            
-            if (targetZoom > zoomLevel) {
-                // Zoom in at tap point
-                const oldZoom = zoomLevel;
-                const oldScrollLeft = container.scrollLeft;
-                const oldScrollTop = container.scrollTop;
-                
-                applyZoom(targetZoom);
-                
-                // Adjust scroll to center on tap point
-                requestAnimationFrame(() => {
-                    const zoomFactor = targetZoom / oldZoom;
-                    const newScrollLeft = relativeX - (relativeX - oldScrollLeft) * zoomFactor;
-                    const newScrollTop = relativeY - (relativeY - oldScrollTop) * zoomFactor;
-                    
-                    container.scrollLeft = newScrollLeft;
-                    container.scrollTop = newScrollTop;
-                });
+            // Smart zoom: if zoomed, zoom out; if not, zoom to comfortable reading level
+            let targetZoom;
+            if (zoomLevel <= 100) {
+                // Zoom to comfortable reading level (150% - best for reading)
+                targetZoom = 150;
+            } else if (zoomLevel <= 150) {
+                // Zoom to detailed view (200%)
+                targetZoom = 200;
             } else {
-                // Zoom out
-                baseScale = calculateScale();
-                applyZoom(100);
+                // Zoom out to fit
+                targetZoom = 100;
             }
+            
+            // Convert tap position to container coordinates for zoom center
+            const relativeX = x - containerRect.left;
+            const relativeY = y - containerRect.top;
+            
+            // Apply smooth zoom with center point
+            applyZoom(targetZoom, true, relativeX, relativeY);
         }
 
         // Double tap for mobile
@@ -2288,27 +2353,12 @@
                 const currentCenterX = (touch1.clientX + touch2.clientX) / 2;
                 const currentCenterY = (touch1.clientY + touch2.clientY) / 2;
                 
-                // Convert touch center to container coordinates
-                const relativeX = currentCenterX - containerRect.left + container.scrollLeft;
-                const relativeY = currentCenterY - containerRect.top + container.scrollTop;
+                // Convert touch center to container coordinates (relative to viewport)
+                const relativeX = currentCenterX - containerRect.left;
+                const relativeY = currentCenterY - containerRect.top;
                 
-                // Store old values before zoom
-                const oldZoom = zoomLevel;
-                const oldScrollLeft = container.scrollLeft;
-                const oldScrollTop = container.scrollTop;
-                
-                // Apply zoom
-                applyZoom(newZoom);
-                
-                // Adjust scroll position to keep touch point in same place
-                requestAnimationFrame(() => {
-                    const zoomFactor = newZoom / oldZoom;
-                    const newScrollLeft = relativeX - (relativeX - oldScrollLeft) * zoomFactor;
-                    const newScrollTop = relativeY - (relativeY - oldScrollTop) * zoomFactor;
-                    
-                    container.scrollLeft = newScrollLeft;
-                    container.scrollTop = newScrollTop;
-                });
+                // Apply zoom with center point (no animation for pinch - instant feedback)
+                applyZoom(newZoom, false, relativeX, relativeY);
                 
                 // Update last distance for next calculation
                 lastTouchDistance = currentDistance;
