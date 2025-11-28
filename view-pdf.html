@@ -1335,7 +1335,8 @@
             // Separate touch handler for controls toggle (single finger only)
             viewerContainer.addEventListener("touchstart", (e) => {
                 // Only handle single touch (not pinch zoom)
-                if (e.touches.length !== 1) {
+                // Skip if already handling pinch zoom
+                if (e.touches.length !== 1 || isPinching) {
                     return;
                 }
 
@@ -1355,7 +1356,8 @@
 
             viewerContainer.addEventListener("touchmove", (e) => {
                 // Only handle single touch
-                if (e.touches.length !== 1) {
+                // Skip if already handling pinch zoom
+                if (e.touches.length !== 1 || isPinching) {
                     touchMoved = true;
                     return;
                 }
@@ -1376,7 +1378,8 @@
 
             viewerContainer.addEventListener("touchend", (e) => {
                 // Only handle single touch
-                if (e.changedTouches.length !== 1) {
+                // Skip if was pinching
+                if (e.changedTouches.length !== 1 || isPinching) {
                     touchMoved = false;
                     return;
                 }
@@ -1867,37 +1870,133 @@
             }
         });
 
-        // Pinch zoom on touch devices
+        // ============================================
+        // PINCH TO ZOOM AT TOUCH POINT (Enhanced)
+        // ============================================
         let lastTouchDistance = 0;
+        let pinchCenterX = 0;
+        let pinchCenterY = 0;
+        let initialZoomLevel = 100;
+        let isPinching = false;
+        let scrollLeftBeforeZoom = 0;
+        let scrollTopBeforeZoom = 0;
+
+        function zoomAtPoint(newZoom, centerX, centerY) {
+            const container = document.getElementById("viewerContainer");
+            const oldZoom = zoomLevel;
+            const oldScrollLeft = container.scrollLeft;
+            const oldScrollTop = container.scrollTop;
+            
+            // Calculate the zoom factor
+            const zoomFactor = newZoom / oldZoom;
+            
+            // Apply zoom (this will re-render pages)
+            applyZoom(newZoom);
+            
+            // Wait a bit for rendering, then adjust scroll position
+            setTimeout(() => {
+                // Calculate new scroll position to keep the touch point in the same place
+                // Formula: newScroll = center - (center - oldScroll) * zoomFactor
+                const newScrollLeft = centerX - (centerX - oldScrollLeft) * zoomFactor;
+                const newScrollTop = centerY - (centerY - oldScrollTop) * zoomFactor;
+                
+                // Apply new scroll position
+                container.scrollLeft = newScrollLeft;
+                container.scrollTop = newScrollTop;
+            }, 10);
+        }
+
         document.getElementById("viewerContainer").addEventListener("touchstart", (e) => {
+            // Don't interfere with drawing
+            if (drawingMode !== 'none' && e.target.closest('.draw-canvas')) {
+                return;
+            }
+
             if (e.touches.length === 2) {
+                isPinching = true;
+                e.preventDefault();
+                
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
+                
+                // Calculate center point of pinch
+                pinchCenterX = (touch1.clientX + touch2.clientX) / 2;
+                pinchCenterY = (touch1.clientY + touch2.clientY) / 2;
+                
+                // Get initial distance
                 lastTouchDistance = Math.hypot(
                     touch2.clientX - touch1.clientX,
                     touch2.clientY - touch1.clientY
                 );
+                
+                // Store initial zoom and scroll position
+                initialZoomLevel = zoomLevel;
+                const container = document.getElementById("viewerContainer");
+                scrollLeftBeforeZoom = container.scrollLeft;
+                scrollTopBeforeZoom = container.scrollTop;
+            } else {
+                isPinching = false;
+                lastTouchDistance = 0;
             }
-        });
+        }, { passive: false });
 
         document.getElementById("viewerContainer").addEventListener("touchmove", (e) => {
-            if (e.touches.length === 2) {
+            // Don't interfere with drawing
+            if (drawingMode !== 'none' && e.target.closest('.draw-canvas')) {
+                return;
+            }
+
+            if (e.touches.length === 2 && isPinching) {
+                e.preventDefault();
+                
                 const touch1 = e.touches[0];
                 const touch2 = e.touches[1];
+                
+                // Calculate current distance
                 const currentDistance = Math.hypot(
                     touch2.clientX - touch1.clientX,
                     touch2.clientY - touch1.clientY
                 );
                 
+                // Calculate new center point (may have moved)
+                const currentCenterX = (touch1.clientX + touch2.clientX) / 2;
+                const currentCenterY = (touch1.clientY + touch2.clientY) / 2;
+                
                 if (lastTouchDistance > 0) {
-                    const delta = currentDistance - lastTouchDistance;
-                    if (Math.abs(delta) > 10) {
-                        applyZoom(zoomLevel + (delta > 0 ? 5 : -5));
-                        lastTouchDistance = currentDistance;
-                    }
+                    // Calculate zoom change based on distance ratio
+                    const distanceRatio = currentDistance / lastTouchDistance;
+                    const zoomChange = (distanceRatio - 1) * 50; // Scale factor for smooth zoom
+                    
+                    // Calculate new zoom level
+                    let newZoom = initialZoomLevel + zoomChange;
+                    
+                    // Limit zoom
+                    const maxZoom = isIOSSafari ? 200 : 400;
+                    const minZoom = isIOSSafari ? 75 : 50;
+                    newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+                    
+                    // Get container for scroll calculations
+                    const container = document.getElementById("viewerContainer");
+                    const containerRect = container.getBoundingClientRect();
+                    
+                    // Convert touch center to container coordinates
+                    const relativeX = currentCenterX - containerRect.left + container.scrollLeft;
+                    const relativeY = currentCenterY - containerRect.top + container.scrollTop;
+                    
+                    // Apply zoom at the touch point
+                    zoomAtPoint(newZoom, relativeX, relativeY);
                 }
+                
+                lastTouchDistance = currentDistance;
             }
-        });
+        }, { passive: false });
+
+        document.getElementById("viewerContainer").addEventListener("touchend", (e) => {
+            if (e.touches.length < 2) {
+                isPinching = false;
+                lastTouchDistance = 0;
+            }
+        }, { passive: true });
 
         // Keyboard shortcuts
         document.addEventListener("keydown", (e) => {
