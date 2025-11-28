@@ -306,6 +306,56 @@
             text-align: center;
         }
 
+        /* Zoom Slider Styles */
+        #zoomSlider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #2a2a2a;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        #zoomSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #3d5a80;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        #zoomSlider::-webkit-slider-thumb:hover {
+            background: #5a7ba8;
+        }
+
+        #zoomSlider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: #3d5a80;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s;
+        }
+
+        #zoomSlider::-moz-range-thumb:hover {
+            background: #5a7ba8;
+        }
+
+        /* Pan cursor when zoomed */
+        body.pan-mode {
+            cursor: grab;
+        }
+
+        body.pan-mode:active {
+            cursor: grabbing;
+        }
+
         /* ============================================
            ZOOM CONTROLS
         ============================================ */
@@ -716,13 +766,18 @@
                 <span class="menu-item-icon">🔄</span>
                 <span>Rotate</span>
             </div>
-            <div class="menu-item" id="zoomIn">
-                <span class="menu-item-icon">➕</span>
-                <span>Zoom In</span>
-            </div>
-            <div class="menu-item" id="zoomOut">
-                <span class="menu-item-icon">➖</span>
-                <span>Zoom Out</span>
+            <div class="menu-item" id="zoomControlItem" style="flex-direction: column; align-items: stretch; gap: 8px; padding: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 12px; color: #ccc;">Zoom Level</span>
+                    <span id="zoomLevelDisplay" style="font-size: 14px; color: #3d5a80; font-weight: 600;">100%</span>
+                </div>
+                <input type="range" id="zoomSlider" min="50" max="400" value="100" step="10" 
+                       style="width: 100%; height: 6px; background: #2a2a2a; border-radius: 3px; outline: none; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-top: 4px;">
+                    <span>50%</span>
+                    <span>200%</span>
+                    <span>400%</span>
+                </div>
             </div>
             <div class="menu-item" id="zoomFit">
                 <span class="menu-item-icon">⛶</span>
@@ -1196,7 +1251,17 @@
             const pageElement = pageWrappers.get(pageNum);
             if (pageElement) {
                 const container = document.getElementById("viewerContainer");
-                pageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Smooth scroll to page center - improved navigation
+                const containerRect = container.getBoundingClientRect();
+                const pageRect = pageElement.getBoundingClientRect();
+                const scrollTop = container.scrollTop + pageRect.top - containerRect.top - (containerRect.height / 2) + (pageRect.height / 2);
+                
+                container.scrollTo({
+                    top: Math.max(0, scrollTop),
+                    behavior: 'smooth'
+                });
+                
                 currentPage = pageNum;
                 updatePageInfo();
             }
@@ -1446,7 +1511,15 @@
             
             zoomLevel = Math.max(minZoom, Math.min(maxZoom, newZoom));
             scale = baseScale * (zoomLevel / 100);
-            document.getElementById("zoomLevel").textContent = zoomLevel + "%";
+            
+            // Update zoom level display
+            const zoomLevelEl = document.getElementById("zoomLevel");
+            if (zoomLevelEl) {
+                zoomLevelEl.textContent = Math.round(zoomLevel) + "%";
+            }
+            
+            // Update slider
+            updateZoomSlider();
             
             // On iOS, only re-render visible pages to save memory
             if (isIOSSafari) {
@@ -1471,24 +1544,39 @@
             }
         }
 
-        // Zoom controls - now in menu
-        document.getElementById("zoomIn").addEventListener("click", () => {
-            applyZoom(zoomLevel + 25);
-            // Close menu after action
-            menuOpen = false;
-            menuItems.classList.remove("active");
-            menuToggle.classList.remove("active");
-            menuToggle.textContent = "☰";
-        });
-
-        document.getElementById("zoomOut").addEventListener("click", () => {
-            applyZoom(zoomLevel - 25);
-            // Close menu after action
-            menuOpen = false;
-            menuItems.classList.remove("active");
-            menuToggle.classList.remove("active");
-            menuToggle.textContent = "☰";
-        });
+        // Zoom slider control - now in menu
+        let zoomSlider = null;
+        let zoomLevelDisplay = null;
+        
+        // Initialize zoom slider after DOM is ready
+        function initZoomSlider() {
+            zoomSlider = document.getElementById("zoomSlider");
+            zoomLevelDisplay = document.getElementById("zoomLevelDisplay");
+            
+            if (zoomSlider) {
+                // Set initial value
+                zoomSlider.value = zoomLevel;
+                
+                // Zoom slider input
+                zoomSlider.addEventListener("input", (e) => {
+                    const newZoom = parseInt(e.target.value);
+                    applyZoom(newZoom);
+                });
+            }
+        }
+        
+        // Update slider when zoom changes
+        function updateZoomSlider() {
+            if (zoomSlider) {
+                zoomSlider.value = Math.round(zoomLevel);
+            }
+            if (zoomLevelDisplay) {
+                zoomLevelDisplay.textContent = Math.round(zoomLevel) + "%";
+            }
+        }
+        
+        // Initialize after page load
+        setTimeout(initZoomSlider, 100);
 
         document.getElementById("zoomFit").addEventListener("click", () => {
             const container = document.getElementById("viewerContainer");
@@ -1858,17 +1946,200 @@
         // ADDITIONAL ENHANCEMENTS
         // ============================================
         
-        // Double-click to zoom
-        document.getElementById("viewerContainer").addEventListener("dblclick", (e) => {
-            if (e.target.classList.contains("pdf-canvas")) {
-                if (zoomLevel === 100) {
-                    applyZoom(150);
+        // ============================================
+        // DOUBLE TAP TO ZOOM (Enhanced - works anywhere)
+        // ============================================
+        let lastTapTime = 0;
+        let lastTapX = 0;
+        let lastTapY = 0;
+        const DOUBLE_TAP_DELAY = 300;
+        const DOUBLE_TAP_DISTANCE = 50; // Max distance between taps
+
+        function handleDoubleTap(x, y) {
+            const container = document.getElementById("viewerContainer");
+            const containerRect = container.getBoundingClientRect();
+            
+            // Convert tap position to container coordinates
+            const relativeX = x - containerRect.left + container.scrollLeft;
+            const relativeY = y - containerRect.top + container.scrollTop;
+            
+            // Comfortable zoom level (200% for reading)
+            const targetZoom = zoomLevel === 100 ? 200 : 100;
+            
+            if (targetZoom > zoomLevel) {
+                // Zoom in at tap point
+                const oldZoom = zoomLevel;
+                const oldScrollLeft = container.scrollLeft;
+                const oldScrollTop = container.scrollTop;
+                
+                applyZoom(targetZoom);
+                
+                // Adjust scroll to center on tap point
+                requestAnimationFrame(() => {
+                    const zoomFactor = targetZoom / oldZoom;
+                    const newScrollLeft = relativeX - (relativeX - oldScrollLeft) * zoomFactor;
+                    const newScrollTop = relativeY - (relativeY - oldScrollTop) * zoomFactor;
+                    
+                    container.scrollLeft = newScrollLeft;
+                    container.scrollTop = newScrollTop;
+                });
+            } else {
+                // Zoom out
+                baseScale = calculateScale();
+                applyZoom(100);
+            }
+        }
+
+        // Double tap for mobile
+        if (isMobile) {
+            viewerContainer.addEventListener("touchend", function handleDoubleTap(e) {
+                if (e.touches.length > 0 || isPinching) return; // Don't interfere with pinch or active touches
+                
+                const currentTime = Date.now();
+                const tapX = e.changedTouches[0].clientX;
+                const tapY = e.changedTouches[0].clientY;
+                
+                // Check if it's a double tap
+                if (currentTime - lastTapTime < DOUBLE_TAP_DELAY &&
+                    Math.abs(tapX - lastTapX) < DOUBLE_TAP_DISTANCE &&
+                    Math.abs(tapY - lastTapY) < DOUBLE_TAP_DISTANCE) {
+                    
+                    e.preventDefault();
+                    handleDoubleTap(tapX, tapY);
+                    lastTapTime = 0; // Reset to prevent triple tap
                 } else {
-                    baseScale = calculateScale();
-                    applyZoom(100);
+                    lastTapTime = currentTime;
+                    lastTapX = tapX;
+                    lastTapY = tapY;
                 }
+            }, { passive: false });
+        }
+
+        // Double click for desktop
+        viewerContainer.addEventListener("dblclick", (e) => {
+            // Don't interfere with other interactions
+            if (e.target.closest('#controls') || e.target.closest('#optionsMenu') || 
+                e.target.closest('#zoomControls') || e.target.closest('#thumbnailSidebar') ||
+                e.target.closest('#searchPanel')) {
+                return;
+            }
+            
+            handleDoubleTap(e.clientX, e.clientY);
+        });
+
+        // ============================================
+        // PAN/DRAG FUNCTIONALITY (Move page when zoomed)
+        // ============================================
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let panStartScrollLeft = 0;
+        let panStartScrollTop = 0;
+
+        function startPan(e) {
+            // Only pan when zoomed in (zoom > 100%)
+            if (zoomLevel <= 100) return;
+            
+            // Don't pan if drawing or other interactions
+            if (drawingMode !== 'none' || e.target.closest('.draw-canvas') ||
+                e.target.closest('#controls') || e.target.closest('#optionsMenu') ||
+                e.target.closest('#zoomControls') || e.target.closest('#thumbnailSidebar') ||
+                e.target.closest('#searchPanel')) {
+                return;
+            }
+
+            isPanning = true;
+            const container = document.getElementById("viewerContainer");
+            
+            if (e.touches && e.touches.length === 1) {
+                // Touch
+                panStartX = e.touches[0].clientX;
+                panStartY = e.touches[0].clientY;
+            } else {
+                // Mouse
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+            }
+            
+            panStartScrollLeft = container.scrollLeft;
+            panStartScrollTop = container.scrollTop;
+            
+            // Change cursor
+            if (!e.touches) {
+                document.body.style.cursor = 'grabbing';
+            }
+        }
+
+        function doPan(e) {
+            if (!isPanning) return;
+            
+            e.preventDefault();
+            const container = document.getElementById("viewerContainer");
+            
+            let currentX, currentY;
+            if (e.touches && e.touches.length === 1) {
+                currentX = e.touches[0].clientX;
+                currentY = e.touches[0].clientY;
+            } else {
+                currentX = e.clientX;
+                currentY = e.clientY;
+            }
+            
+            const deltaX = panStartX - currentX;
+            const deltaY = panStartY - currentY;
+            
+            container.scrollLeft = panStartScrollLeft + deltaX;
+            container.scrollTop = panStartScrollTop + deltaY;
+        }
+
+        function endPan() {
+            if (isPanning) {
+                isPanning = false;
+                document.body.style.cursor = '';
+            }
+        }
+
+        // Mouse pan (for desktop when zoomed)
+        viewerContainer.addEventListener("mousedown", (e) => {
+            if (zoomLevel > 100 && e.button === 0) { // Left mouse button
+                startPan(e);
             }
         });
+
+        viewerContainer.addEventListener("mousemove", (e) => {
+            if (isPanning) {
+                doPan(e);
+            }
+        });
+
+        viewerContainer.addEventListener("mouseup", endPan);
+        viewerContainer.addEventListener("mouseleave", endPan);
+
+        // Touch pan (for mobile when zoomed) - separate handler
+        if (isMobile) {
+            let touchPanStartTime = 0;
+            
+            viewerContainer.addEventListener("touchstart", function handlePanStart(e) {
+                // Only pan with single touch when zoomed, not during pinch
+                if (e.touches.length === 1 && zoomLevel > 100 && !isPinching && !isPanning) {
+                    touchPanStartTime = Date.now();
+                    startPan(e);
+                }
+            }, { passive: false, capture: false });
+
+            viewerContainer.addEventListener("touchmove", function handlePanMove(e) {
+                // Only pan with single touch when zoomed
+                if (e.touches.length === 1 && isPanning && !isPinching) {
+                    doPan(e);
+                }
+            }, { passive: false, capture: false });
+
+            viewerContainer.addEventListener("touchend", function handlePanEnd(e) {
+                if (e.touches.length === 0 && isPanning) {
+                    endPan();
+                }
+            }, { passive: true });
+        }
 
         // ============================================
         // PINCH TO ZOOM AT TOUCH POINT (Enhanced)
