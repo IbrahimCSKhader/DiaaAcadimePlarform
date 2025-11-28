@@ -35,12 +35,18 @@
             height: 100vh;
             overflow-y: scroll;
             -webkit-overflow-scrolling: touch;
-            overflow-x: hidden;
+            overflow-x: auto; /* Allow horizontal scroll when zoomed */
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 80px 20px 20px;
             position: relative;
+        }
+
+        /* Enable horizontal scroll when zoomed */
+        #viewerContainer.zoomed {
+            overflow-x: auto;
+            align-items: flex-start; /* Align to left when zoomed for better scrolling */
         }
 
         .page-wrapper {
@@ -53,6 +59,18 @@
             max-width: 100%;
             background: #2a2a2a;
             border-radius: 8px;
+            transform-origin: center top;
+            transition: transform 0.2s ease;
+            /* Allow horizontal scroll when zoomed */
+            overflow: visible;
+            min-width: fit-content;
+        }
+
+        /* When zoomed, allow horizontal scrolling */
+        .page-wrapper.zoomed {
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
         }
 
         /* Ensure text layer is selectable */
@@ -999,8 +1017,8 @@
                     if (renderedPages.has(pageNum)) return;
 
                     const page = await pdfDoc.getPage(pageNum);
-                    // Use enhanced scale for high resolution rendering
-                    const viewport = page.getViewport({ scale: scale });
+                    // Always use baseScale for viewport - zoom is handled by CSS transform
+                    const viewport = page.getViewport({ scale: baseScale });
 
                     const pageWrapper = pageWrappers.get(pageNum);
                     if (!pageWrapper) return;
@@ -1110,6 +1128,21 @@
                 pageWrapper.appendChild(pdfCanvas);
                 pageWrapper.appendChild(textLayerDiv);
                 pageWrapper.appendChild(drawCanvas);
+
+                // Store base dimensions for zoom
+                pageWrapper.dataset.baseWidth = viewport.width + "";
+                pageWrapper.dataset.baseHeight = viewport.height + "";
+
+                // Apply current zoom level using CSS transform
+                const currentZoomFactor = zoomLevel / 100;
+                pageWrapper.style.transform = `scale(${currentZoomFactor})`;
+                pageWrapper.style.transformOrigin = "center top";
+                
+                // Enable horizontal scroll when zoomed
+                if (zoomLevel > 100) {
+                    pageWrapper.classList.add("zoomed");
+                    pageWrapper.style.minWidth = (viewport.width * currentZoomFactor) + "px";
+                }
 
                     drawCanvases.set(pageNum, drawCanvas);
                 enableDrawing(drawCanvas);
@@ -1510,7 +1543,10 @@
             const minZoom = isIOSSafari ? 75 : 50;
             
             zoomLevel = Math.max(minZoom, Math.min(maxZoom, newZoom));
-            scale = baseScale * (zoomLevel / 100);
+            
+            // Keep scale constant - only change CSS transform for zoom
+            // This keeps page size constant while zooming content
+            scale = baseScale; // Always use baseScale for rendering
             
             // Update zoom level display
             const zoomLevelEl = document.getElementById("zoomLevel");
@@ -1521,27 +1557,49 @@
             // Update slider
             updateZoomSlider();
             
-            // On iOS, only re-render visible pages to save memory
-            if (isIOSSafari) {
-                // Only re-render current page and adjacent pages
-                const pagesToRender = [currentPage];
-                if (currentPage > 1) pagesToRender.push(currentPage - 1);
-                if (currentPage < pdfDoc.numPages) pagesToRender.push(currentPage + 1);
-                
-                pagesToRender.forEach(pageNum => {
-                    if (renderedPages.has(pageNum)) {
-                        renderedPages.delete(pageNum); // Force re-render
-                        renderPage(pageNum);
-                    }
-                });
+            // Check if zoomed (more than 100%)
+            const isZoomed = zoomLevel > 100;
+            const container = document.getElementById("viewerContainer");
+            
+            // Enable/disable horizontal scroll based on zoom level
+            if (isZoomed) {
+                container.classList.add("zoomed");
             } else {
-                // Re-render all rendered pages with new scale
-                const pagesToReRender = Array.from(renderedPages);
-                renderedPages.clear(); // Clear to force re-render
-                pagesToReRender.forEach(pageNum => {
-                    renderPage(pageNum);
-                });
+                container.classList.remove("zoomed");
             }
+            
+            // Apply CSS transform to all page wrappers instead of re-rendering
+            const zoomFactor = zoomLevel / 100;
+            pageWrappers.forEach((wrapper, pageNum) => {
+                if (wrapper) {
+                    // Apply transform to zoom content without changing page size
+                    wrapper.style.transform = `scale(${zoomFactor})`;
+                    wrapper.style.transformOrigin = "center top";
+                    
+                    // Enable horizontal scroll on page wrapper when zoomed
+                    if (isZoomed) {
+                        wrapper.classList.add("zoomed");
+                        // Get base width from dataset or calculate it
+                        const baseWidth = parseFloat(wrapper.dataset.baseWidth || "0");
+                        if (baseWidth > 0) {
+                            // Set min-width to allow horizontal scrolling
+                            wrapper.style.minWidth = (baseWidth * zoomFactor) + "px";
+                        }
+                    } else {
+                        wrapper.classList.remove("zoomed");
+                        wrapper.style.minWidth = "";
+                    }
+                    
+                    // Keep wrapper size constant - store base dimensions
+                    if (!wrapper.dataset.baseWidth) {
+                        const currentWidth = wrapper.offsetWidth;
+                        const currentHeight = wrapper.offsetHeight;
+                        const currentScale = wrapper.style.transform ? parseFloat(wrapper.style.transform.match(/scale\(([^)]+)\)/)?.[1] || 1) : 1;
+                        wrapper.dataset.baseWidth = (currentWidth / currentScale) + "";
+                        wrapper.dataset.baseHeight = (currentHeight / currentScale) + "";
+                    }
+                }
+            });
         }
 
         // Zoom slider control - now in menu
