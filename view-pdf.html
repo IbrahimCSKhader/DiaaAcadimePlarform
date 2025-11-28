@@ -54,7 +54,7 @@
 
         .page-wrapper {
             position: relative;
-            margin: 15px 0;
+            margin: 20px 0; /* Increased base margin for better separation */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -70,6 +70,8 @@
             box-sizing: border-box;
             /* Prevent pages from overlapping when zoomed */
             isolation: isolate;
+            /* Ensure minimum spacing between pages */
+            min-height: fit-content;
         }
 
         /* When zoomed, allow horizontal scrolling and increase spacing */
@@ -1155,10 +1157,15 @@
                     pageWrapper.style.minWidth = (viewport.width * currentZoomFactor) + "px";
                     pageWrapper.style.maxWidth = "none";
                     // Calculate proper margin to prevent overlap
-                    const baseMargin = 15;
-                    const extraMargin = (currentZoomFactor - 1) * 30; // Extra spacing when zoomed
-                    const totalMargin = baseMargin + extraMargin;
+                    // Use minimum margin that scales with zoom to ensure separation
+                    const baseMargin = 20; // Base margin in pixels
+                    // Scale margin proportionally with zoom to maintain separation
+                    const scaledMargin = baseMargin * currentZoomFactor;
+                    // Add extra buffer to ensure no overlap
+                    const extraBuffer = 10; // Extra pixels for safety
+                    const totalMargin = scaledMargin + extraBuffer;
                     
+                    // Apply margin to ensure pages never overlap
                     pageWrapper.style.marginTop = totalMargin + "px";
                     pageWrapper.style.marginBottom = totalMargin + "px";
                 } else {
@@ -1664,18 +1671,20 @@
                             }
                             
                             // Calculate proper margin to prevent overlap
-                            // Margin should account for the scaled height difference
-                            const baseMargin = 15;
-                            // Add extra margin based on zoom level to prevent overlap
-                            const extraMargin = (zoomFactor - 1) * 30; // Extra spacing when zoomed
-                            const totalMargin = baseMargin + extraMargin;
+                            // Use minimum margin that scales with zoom to ensure separation
+                            const baseMargin = 20; // Base margin in pixels
+                            // Scale margin proportionally with zoom to maintain separation
+                            const scaledMargin = baseMargin * zoomFactor;
+                            // Add extra buffer to ensure no overlap
+                            const extraBuffer = 10; // Extra pixels for safety
+                            const totalMargin = scaledMargin + extraBuffer;
                             
+                            // Apply margin to ensure pages never overlap
                             wrapper.style.marginTop = totalMargin + "px";
                             wrapper.style.marginBottom = totalMargin + "px";
                             
-                            // Also add padding to ensure separation
-                            wrapper.style.paddingTop = "0px";
-                            wrapper.style.paddingBottom = "0px";
+                            // Ensure wrapper has proper spacing
+                            wrapper.style.display = "block";
                         } else {
                             wrapper.classList.remove("zoomed");
                             wrapper.style.width = "";
