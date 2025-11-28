@@ -1172,22 +1172,21 @@
                     pageWrapper.style.width = (viewport.width * currentZoomFactor) + "px";
                     pageWrapper.style.minWidth = (viewport.width * currentZoomFactor) + "px";
                     pageWrapper.style.maxWidth = "none";
-                    // Calculate margin: keep it small, especially when zoomed out
-                    let totalMargin;
-                    if (zoomLevel < 100) {
-                        // When zoomed out (50%, 75%), use very small fixed margin
-                        totalMargin = 8; // Very small margin when zoomed out
-                    } else {
-                        // When zoomed in or at 100%, use small dynamic margin
-                        const scaledHeight = viewport.height * currentZoomFactor;
-                        const heightBasedMargin = scaledHeight * 0.005; // Only 0.5% of scaled height
-                        totalMargin = Math.max(10, heightBasedMargin + 3); // Small buffer, minimum 10px
-                    }
+                    // Calculate proper margin to prevent overlap
+                    // Use minimum margin that scales with zoom to ensure separation
+                    // Calculate margin: small and relative to zoom level
+                    // Keep margins small at all zoom levels (including when zoomed out)
+                    const baseMargin = 10; // Small base margin
+                    const scaledHeight = viewport.height * currentZoomFactor;
+                    // Very small percentage of height - just enough to prevent overlap
+                    const heightBasedMargin = scaledHeight * 0.008; // Only 0.8% of scaled height
+                    // Use the smaller value to keep margins minimal at all zoom levels
+                    const totalMargin = Math.max(baseMargin, heightBasedMargin + 3); // Small buffer
                     
                     // Apply margin to ensure pages never overlap (but keep it small)
                     pageWrapper.style.marginTop = totalMargin + "px";
                     pageWrapper.style.marginBottom = totalMargin + "px";
-                    pageWrapper.style.minHeight = (viewport.height * currentZoomFactor) + "px";
+                    pageWrapper.style.minHeight = scaledHeight + "px";
                 } else {
                     pageWrapper.style.width = "";
                     pageWrapper.style.minWidth = "";
@@ -1699,17 +1698,14 @@
                                 wrapper.style.marginRight = "auto";
                             }
                             
-                            // Calculate margin: keep it small, especially when zoomed out
-                            let totalMargin;
-                            if (zoomLevel < 100) {
-                                // When zoomed out (50%, 75%), use very small fixed margin
-                                totalMargin = 8; // Very small margin when zoomed out
-                            } else {
-                                // When zoomed in or at 100%, use small dynamic margin
-                                const scaledHeight = baseHeight * zoomFactor;
-                                const heightBasedMargin = scaledHeight * 0.005; // Only 0.5% of scaled height
-                                totalMargin = Math.max(10, heightBasedMargin + 3); // Small buffer, minimum 10px
-                            }
+                            // Calculate margin: small at all zoom levels (including when zoomed out)
+                            // Keep margins small and proportional to prevent overlap without being too large
+                            const baseMargin = 10; // Small base margin
+                            const scaledHeight = baseHeight * zoomFactor;
+                            // Very small percentage of height - just enough to prevent overlap
+                            const heightBasedMargin = scaledHeight * 0.008; // Only 0.8% of scaled height
+                            // Use the smaller value to keep margins minimal at all zoom levels
+                            const totalMargin = Math.max(baseMargin, heightBasedMargin + 3); // Small buffer
                             
                             // Apply margin to ensure pages never overlap (but keep it small)
                             wrapper.style.marginTop = totalMargin + "px";
