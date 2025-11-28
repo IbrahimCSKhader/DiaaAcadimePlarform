@@ -820,8 +820,8 @@
                        style="width: 100%; height: 6px; background: #2a2a2a; border-radius: 3px; outline: none; cursor: pointer;">
                 <div style="display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-top: 4px;">
                     <span>50%</span>
+                    <span>100%</span>
                     <span>200%</span>
-                    <span>400%</span>
                 </div>
             </div>
             <div class="menu-item" id="zoomFit">
@@ -1172,21 +1172,22 @@
                     pageWrapper.style.width = (viewport.width * currentZoomFactor) + "px";
                     pageWrapper.style.minWidth = (viewport.width * currentZoomFactor) + "px";
                     pageWrapper.style.maxWidth = "none";
-                    // Calculate proper margin to prevent overlap
-                    // Use minimum margin that scales with zoom to ensure separation
-                    // Calculate margin: small and relative to zoom level
-                    // Keep margins small at all zoom levels (including when zoomed out)
-                    const baseMargin = 10; // Small base margin
-                    const scaledHeight = viewport.height * currentZoomFactor;
-                    // Very small percentage of height - just enough to prevent overlap
-                    const heightBasedMargin = scaledHeight * 0.008; // Only 0.8% of scaled height
-                    // Use the smaller value to keep margins minimal at all zoom levels
-                    const totalMargin = Math.max(baseMargin, heightBasedMargin + 3); // Small buffer
+                    // Calculate margin: keep it small at all zoom levels
+                    let totalMargin;
+                    if (zoomLevel <= 100) {
+                        // When zoomed out or at 100%, use fixed small margin
+                        totalMargin = 10;
+                    } else {
+                        // When zoomed in, use very small dynamic margin
+                        const scaledHeight = viewport.height * currentZoomFactor;
+                        const heightBasedMargin = scaledHeight * 0.005; // Only 0.5% of scaled height
+                        totalMargin = Math.max(10, heightBasedMargin + 3); // Small buffer, minimum 10px
+                    }
                     
                     // Apply margin to ensure pages never overlap (but keep it small)
                     pageWrapper.style.marginTop = totalMargin + "px";
                     pageWrapper.style.marginBottom = totalMargin + "px";
-                    pageWrapper.style.minHeight = scaledHeight + "px";
+                    pageWrapper.style.minHeight = (viewport.height * currentZoomFactor) + "px";
                 } else {
                     pageWrapper.style.width = "";
                     pageWrapper.style.minWidth = "";
@@ -1698,14 +1699,17 @@
                                 wrapper.style.marginRight = "auto";
                             }
                             
-                            // Calculate margin: small at all zoom levels (including when zoomed out)
-                            // Keep margins small and proportional to prevent overlap without being too large
-                            const baseMargin = 10; // Small base margin
-                            const scaledHeight = baseHeight * zoomFactor;
-                            // Very small percentage of height - just enough to prevent overlap
-                            const heightBasedMargin = scaledHeight * 0.008; // Only 0.8% of scaled height
-                            // Use the smaller value to keep margins minimal at all zoom levels
-                            const totalMargin = Math.max(baseMargin, heightBasedMargin + 3); // Small buffer
+                            // Calculate margin: keep it small at all zoom levels
+                            let totalMargin;
+                            if (zoomLevel <= 100) {
+                                // When zoomed out or at 100%, use fixed small margin
+                                totalMargin = 10;
+                            } else {
+                                // When zoomed in, use very small dynamic margin
+                                const scaledHeight = baseHeight * zoomFactor;
+                                const heightBasedMargin = scaledHeight * 0.005; // Only 0.5% of scaled height
+                                totalMargin = Math.max(10, heightBasedMargin + 3); // Small buffer, minimum 10px
+                            }
                             
                             // Apply margin to ensure pages never overlap (but keep it small)
                             wrapper.style.marginTop = totalMargin + "px";
