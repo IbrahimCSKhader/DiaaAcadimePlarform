@@ -50,6 +50,9 @@
             align-items: flex-start; /* Align to left when zoomed for better scrolling */
             /* Ensure smooth scrolling in both directions */
             scroll-behavior: auto;
+            /* Allow scrolling to negative values (left side) */
+            padding-left: 0;
+            padding-right: 0;
         }
 
         .page-wrapper {
@@ -60,7 +63,7 @@
             max-width: 100%;
             background: #2a2a2a;
             border-radius: 8px;
-            transform-origin: top center;
+            transform-origin: top left; /* Changed to top left for better scrolling */
             /* Allow horizontal scroll when zoomed */
             overflow: visible;
             min-width: fit-content;
@@ -70,12 +73,21 @@
             isolation: isolate;
             /* Ensure minimum spacing between pages */
             min-height: fit-content;
-            /* Center content */
+            /* Center content when not zoomed */
             text-align: center;
         }
         
         .page-wrapper > * {
             margin: 0 auto; /* Center all children */
+        }
+        
+        /* When zoomed, align to left for proper scrolling */
+        .page-wrapper.zoomed {
+            text-align: left;
+        }
+        
+        .page-wrapper.zoomed > * {
+            margin: 0; /* Remove auto margin when zoomed */
         }
 
         /* When zoomed, allow horizontal scrolling and increase spacing */
@@ -804,7 +816,7 @@
                     <span style="font-size: 12px; color: #ccc;">Zoom Level</span>
                     <span id="zoomLevelDisplay" style="font-size: 14px; color: #3d5a80; font-weight: 600;">100%</span>
                 </div>
-                <input type="range" id="zoomSlider" min="50" max="400" value="100" step="10" 
+                <input type="range" id="zoomSlider" min="50" max="200" value="100" step="5" 
                        style="width: 100%; height: 6px; background: #2a2a2a; border-radius: 3px; outline: none; cursor: pointer;">
                 <div style="display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-top: 4px;">
                     <span>50%</span>
@@ -1151,7 +1163,7 @@
                 // Apply current zoom level using CSS transform
                 const currentZoomFactor = zoomLevel / 100;
                 pageWrapper.style.transform = `scale(${currentZoomFactor})`;
-                pageWrapper.style.transformOrigin = "top center";
+                pageWrapper.style.transformOrigin = "top left"; // Changed to top left for better scrolling
                 
                 // Enable horizontal scroll when zoomed
                 if (zoomLevel > 100) {
@@ -1163,12 +1175,13 @@
                     // Calculate proper margin to prevent overlap
                     // Use minimum margin that scales with zoom to ensure separation
                     // Calculate margin: small and relative to zoom level
+                    // Keep margins small at all zoom levels (including when zoomed out)
                     const baseMargin = 10; // Small base margin
                     const scaledHeight = viewport.height * currentZoomFactor;
-                    // Small percentage of height - just enough to prevent overlap
-                    const heightBasedMargin = scaledHeight * 0.01; // Only 1% of scaled height
-                    // Use the smaller value to keep margins minimal
-                    const totalMargin = Math.max(baseMargin, heightBasedMargin + 5); // Small buffer
+                    // Very small percentage of height - just enough to prevent overlap
+                    const heightBasedMargin = scaledHeight * 0.008; // Only 0.8% of scaled height
+                    // Use the smaller value to keep margins minimal at all zoom levels
+                    const totalMargin = Math.max(baseMargin, heightBasedMargin + 3); // Small buffer
                     
                     // Apply margin to ensure pages never overlap (but keep it small)
                     pageWrapper.style.marginTop = totalMargin + "px";
@@ -1580,9 +1593,9 @@
         let targetZoomLevel = 100;
         
         function applyZoom(newZoom, animate = true, centerX = null, centerY = null) {
-            // Enhanced zoom limits for high resolution
-            const maxZoom = isIOSSafari ? 200 : 400;
-            const minZoom = isIOSSafari ? 75 : 50;
+            // Zoom limits: 50% minimum, 200% maximum for all devices
+            const maxZoom = 200;
+            const minZoom = 50;
             
             targetZoomLevel = Math.max(minZoom, Math.min(maxZoom, newZoom));
             
@@ -1656,34 +1669,43 @@
                         }
                         
                         // Apply transform to zoom the entire page
-                        if (centerX !== null && centerY !== null) {
-                            // Zoom at specific point
-                            wrapper.style.transform = `scale(${zoomFactor})`;
-                            wrapper.style.transformOrigin = `${centerX}px ${centerY}px`;
-                        } else {
-                            // Zoom from center top
-                            wrapper.style.transform = `scale(${zoomFactor})`;
-                            wrapper.style.transformOrigin = "top center";
-                        }
+                        // Always use top left origin to allow proper scrolling in all directions
+                        wrapper.style.transform = `scale(${zoomFactor})`;
+                        wrapper.style.transformOrigin = "top left";
                         
                         // Enable horizontal scroll on page wrapper when zoomed
                         if (isZoomed) {
                             wrapper.classList.add("zoomed");
                             // Set actual width to allow scrolling
                             if (baseWidth > 0) {
-                                wrapper.style.width = (baseWidth * zoomFactor) + "px";
-                                wrapper.style.minWidth = (baseWidth * zoomFactor) + "px";
+                                const scaledWidth = baseWidth * zoomFactor;
+                                wrapper.style.width = scaledWidth + "px";
+                                wrapper.style.minWidth = scaledWidth + "px";
                                 wrapper.style.maxWidth = "none";
+                                // Ensure wrapper can scroll horizontally
+                                wrapper.style.overflowX = "visible";
                             }
                             
-                            // Calculate margin: small and relative to zoom level
+                            // Center the scaled page within container when zoomed
+                            // This allows scrolling in all directions
+                            const container = document.getElementById("viewerContainer");
+                            const containerWidth = container.clientWidth;
+                            const scaledPageWidth = baseWidth * zoomFactor;
+                            
+                            // If page is wider than container, allow left scrolling
+                            if (scaledPageWidth > containerWidth) {
+                                wrapper.style.marginLeft = "0";
+                                wrapper.style.marginRight = "auto";
+                            }
+                            
+                            // Calculate margin: small at all zoom levels (including when zoomed out)
                             // Keep margins small and proportional to prevent overlap without being too large
                             const baseMargin = 10; // Small base margin
                             const scaledHeight = baseHeight * zoomFactor;
-                            // Small percentage of height - just enough to prevent overlap
-                            const heightBasedMargin = scaledHeight * 0.01; // Only 1% of scaled height
-                            // Use the smaller value to keep margins minimal
-                            const totalMargin = Math.max(baseMargin, heightBasedMargin + 5); // Small buffer
+                            // Very small percentage of height - just enough to prevent overlap
+                            const heightBasedMargin = scaledHeight * 0.008; // Only 0.8% of scaled height
+                            // Use the smaller value to keep margins minimal at all zoom levels
+                            const totalMargin = Math.max(baseMargin, heightBasedMargin + 3); // Small buffer
                             
                             // Apply margin to ensure pages never overlap (but keep it small)
                             wrapper.style.marginTop = totalMargin + "px";
@@ -1709,11 +1731,17 @@
                 if (centerX !== null && centerY !== null && progress > 0) {
                     const zoomFactorChange = zoomLevel / startZoom;
                     const containerRect = container.getBoundingClientRect();
-                    const relativeX = centerX - containerRect.left + container.scrollLeft;
-                    const relativeY = centerY - containerRect.top + container.scrollTop;
+                    // Calculate relative position from viewport (not including scroll)
+                    const relativeX = centerX - containerRect.left;
+                    const relativeY = centerY - containerRect.top;
                     
-                    container.scrollLeft = relativeX - (relativeX - container.scrollLeft) * zoomFactorChange;
-                    container.scrollTop = relativeY - (relativeY - container.scrollTop) * zoomFactorChange;
+                    // Adjust scroll to keep the point in view
+                    // For top-left origin, we need to adjust differently
+                    const newScrollLeft = container.scrollLeft + (relativeX * (zoomFactorChange - 1));
+                    const newScrollTop = container.scrollTop + (relativeY * (zoomFactorChange - 1));
+                    
+                    container.scrollLeft = Math.max(0, newScrollLeft);
+                    container.scrollTop = Math.max(0, newScrollTop);
                 }
                 
                 if (progress < 1) {
@@ -2424,9 +2452,9 @@
                 // Calculate new zoom level
                 let newZoom = initialZoomLevel * distanceRatio;
                 
-                // Limit zoom
-                const maxZoom = isIOSSafari ? 200 : 400;
-                const minZoom = isIOSSafari ? 75 : 50;
+                // Limit zoom: 50% minimum, 200% maximum for all devices
+                const maxZoom = 200;
+                const minZoom = 50;
                 newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
                 
                 // Get container for scroll calculations
