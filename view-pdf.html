@@ -54,8 +54,8 @@
 
         .page-wrapper {
             position: relative;
-            margin: 30px 0; /* Increased base margin for better separation */
-            display: block; /* Changed from flex to block for better spacing control */
+            margin: 10px 0; /* Small margin when not zoomed */
+            display: block;
             width: 100%;
             max-width: 100%;
             background: #2a2a2a;
@@ -1162,18 +1162,18 @@
                     pageWrapper.style.maxWidth = "none";
                     // Calculate proper margin to prevent overlap
                     // Use minimum margin that scales with zoom to ensure separation
-                    // Calculate margin based on actual scaled height to prevent overlap
-                    const baseMargin = 40; // Minimum margin (increased significantly)
+                    // Calculate margin: small and relative to zoom level
+                    const baseMargin = 10; // Small base margin
                     const scaledHeight = viewport.height * currentZoomFactor;
-                    // Use a larger percentage of height for margin to ensure separation
-                    const heightBasedMargin = scaledHeight * 0.05; // 5% of scaled height as margin
-                    // Take the maximum to ensure adequate spacing
-                    const totalMargin = Math.max(baseMargin * currentZoomFactor, heightBasedMargin + baseMargin);
+                    // Small percentage of height - just enough to prevent overlap
+                    const heightBasedMargin = scaledHeight * 0.01; // Only 1% of scaled height
+                    // Use the smaller value to keep margins minimal
+                    const totalMargin = Math.max(baseMargin, heightBasedMargin + 5); // Small buffer
                     
-                    // Apply margin to ensure pages never overlap
+                    // Apply margin to ensure pages never overlap (but keep it small)
                     pageWrapper.style.marginTop = totalMargin + "px";
                     pageWrapper.style.marginBottom = totalMargin + "px";
-                    pageWrapper.style.minHeight = (scaledHeight + (totalMargin * 2)) + "px"; // Include margins in min-height
+                    pageWrapper.style.minHeight = scaledHeight + "px";
                 } else {
                     pageWrapper.style.width = "";
                     pageWrapper.style.minWidth = "";
@@ -1676,30 +1676,22 @@
                                 wrapper.style.maxWidth = "none";
                             }
                             
-                            // Calculate margin based on actual scaled height to prevent overlap
-                            // Get the actual height of the page after scaling
-                            const canvas = wrapper.querySelector('.pdf-canvas');
-                            let actualHeight = baseHeight;
-                            if (canvas) {
-                                actualHeight = parseFloat(canvas.style.height) || canvas.offsetHeight;
-                            }
+                            // Calculate margin: small and relative to zoom level
+                            // Keep margins small and proportional to prevent overlap without being too large
+                            const baseMargin = 10; // Small base margin
+                            const scaledHeight = baseHeight * zoomFactor;
+                            // Small percentage of height - just enough to prevent overlap
+                            const heightBasedMargin = scaledHeight * 0.01; // Only 1% of scaled height
+                            // Use the smaller value to keep margins minimal
+                            const totalMargin = Math.max(baseMargin, heightBasedMargin + 5); // Small buffer
                             
-                            // Calculate margin: ensure minimum spacing + percentage of scaled height
-                            // This ensures pages never overlap regardless of zoom level
-                            const baseMargin = 40; // Minimum margin (increased significantly)
-                            const scaledHeight = actualHeight * zoomFactor;
-                            // Use a larger percentage of height for margin to ensure separation
-                            const heightBasedMargin = scaledHeight * 0.05; // 5% of scaled height as margin
-                            // Take the maximum to ensure adequate spacing
-                            const totalMargin = Math.max(baseMargin * zoomFactor, heightBasedMargin + baseMargin);
-                            
-                            // Apply margin to ensure pages never overlap
+                            // Apply margin to ensure pages never overlap (but keep it small)
                             wrapper.style.marginTop = totalMargin + "px";
                             wrapper.style.marginBottom = totalMargin + "px";
                             
                             // Ensure wrapper has proper spacing and doesn't collapse
                             wrapper.style.display = "block";
-                            wrapper.style.minHeight = (scaledHeight + (totalMargin * 2)) + "px"; // Include margins in min-height
+                            wrapper.style.minHeight = scaledHeight + "px";
                         } else {
                             wrapper.classList.remove("zoomed");
                             wrapper.style.width = "";
@@ -2252,14 +2244,12 @@
         let panStartScrollTop = 0;
 
         function startPan(e) {
-            // Only pan when zoomed in (zoom > 100%)
-            if (zoomLevel <= 100) return;
-            
+            // Pan works at any zoom level, but more useful when zoomed
             // Don't pan if drawing or other interactions
             if (drawingMode !== 'none' || e.target.closest('.draw-canvas') ||
                 e.target.closest('#controls') || e.target.closest('#optionsMenu') ||
                 e.target.closest('#zoomControls') || e.target.closest('#thumbnailSidebar') ||
-                e.target.closest('#searchPanel')) {
+                e.target.closest('#searchPanel') || e.target.closest('.textLayer')) {
                 return;
             }
 
@@ -2314,9 +2304,10 @@
             }
         }
 
-        // Mouse pan (for desktop when zoomed)
+        // Mouse pan (for desktop - works at any zoom level)
         viewerContainer.addEventListener("mousedown", (e) => {
-            if (zoomLevel > 100 && e.button === 0) { // Left mouse button
+            // Allow pan at any zoom level for better control
+            if (e.button === 0 && !e.target.closest('.textLayer')) { // Left mouse button, not on text layer
                 startPan(e);
             }
         });
@@ -2335,8 +2326,9 @@
             let touchPanStartTime = 0;
             
             viewerContainer.addEventListener("touchstart", function handlePanStart(e) {
-                // Only pan with single touch when zoomed, not during pinch
-                if (e.touches.length === 1 && zoomLevel > 100 && !isPinching && !isPanning) {
+                // Pan with single touch (works at any zoom level), not during pinch
+                if (e.touches.length === 1 && !isPinching && !isPanning && 
+                    !e.target.closest('.textLayer') && drawingMode === 'none') {
                     touchPanStartTime = Date.now();
                     startPan(e);
                 }
