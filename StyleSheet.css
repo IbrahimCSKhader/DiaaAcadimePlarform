@@ -155,6 +155,78 @@ body {
     opacity: 0.95;
 }
 
+/* Quran Verse Section */
+.quran-verse-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 50px 20px;
+    text-align: center;
+    border-top: 3px solid var(--accent-color);
+    border-bottom: 3px solid var(--accent-color);
+    margin: 0;
+}
+
+.quran-verse-content {
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.quran-icon {
+    font-size: 3rem;
+    color: var(--accent-color);
+    margin-bottom: 10px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+.quran-text {
+    direction: rtl;
+}
+
+.quran-verse {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-dark);
+    line-height: 1.8;
+    margin-bottom: 15px;
+    font-family: 'Amiri', 'Tajawal', serif;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.quran-reference {
+    font-size: 1.1rem;
+    color: var(--text-light);
+    font-style: italic;
+    margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+    .quran-verse {
+        font-size: 1.5rem;
+    }
+    
+    .quran-icon {
+        font-size: 2.5rem;
+    }
+    
+    .quran-reference {
+        font-size: 1rem;
+    }
+}
+
 .page-header {
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
     color: var(--white);
