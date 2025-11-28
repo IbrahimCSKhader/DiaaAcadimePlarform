@@ -309,45 +309,9 @@
         /* ============================================
            ZOOM CONTROLS
         ============================================ */
+        /* Zoom controls moved to menu - hide the separate zoom controls */
         #zoomControls {
-            position: fixed;
-            bottom: 100px;
-            right: 30px;
-            z-index: 10002;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            background: rgba(0,0,0,0.85);
-            padding: 12px;
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-        }
-
-        #zoomControls button {
-            width: 45px;
-            height: 45px;
-            border-radius: 8px;
-            border: none;
-            background: #3d5a80;
-            color: white;
-            cursor: pointer;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
-        }
-
-        #zoomControls button:hover {
-            background: #2c4458;
-        }
-
-        #zoomLevel {
-            text-align: center;
-            color: #ccc;
-            font-size: 12px;
-            margin-top: 4px;
+            display: none;
         }
 
         /* ============================================
@@ -505,15 +469,13 @@
         }
 
         body.fullscreen #controls,
-        body.fullscreen #optionsMenu,
-        body.fullscreen #zoomControls {
+        body.fullscreen #optionsMenu {
             opacity: 0.3;
             transition: opacity 0.3s;
         }
 
         body.fullscreen #controls:hover,
-        body.fullscreen #optionsMenu:hover,
-        body.fullscreen #zoomControls:hover {
+        body.fullscreen #optionsMenu:hover {
             opacity: 1;
         }
 
@@ -709,12 +671,8 @@
         </div>
     </div>
 
-    <!-- Zoom Controls -->
-    <div id="zoomControls">
-        <button id="zoomIn" title="تكبير">➕</button>
-        <button id="zoomOut" title="تصغير">➖</button>
-        <button id="zoomFit" title="ملء الشاشة">⛶</button>
-        <button id="zoomReset" title="إعادة تعيين">↺</button>
+    <!-- Zoom Controls - Moved to menu -->
+    <div id="zoomControls" style="display: none;">
         <div id="zoomLevel">100%</div>
     </div>
 
@@ -757,6 +715,22 @@
             <div class="menu-item" id="rotatePage">
                 <span class="menu-item-icon">🔄</span>
                 <span>Rotate</span>
+            </div>
+            <div class="menu-item" id="zoomIn">
+                <span class="menu-item-icon">➕</span>
+                <span>Zoom In</span>
+            </div>
+            <div class="menu-item" id="zoomOut">
+                <span class="menu-item-icon">➖</span>
+                <span>Zoom Out</span>
+            </div>
+            <div class="menu-item" id="zoomFit">
+                <span class="menu-item-icon">⛶</span>
+                <span>Fit to Screen</span>
+            </div>
+            <div class="menu-item" id="zoomReset">
+                <span class="menu-item-icon">↺</span>
+                <span>Reset Zoom</span>
             </div>
             <div class="menu-item" id="toggleStats">
                 <span class="menu-item-icon">📊</span>
@@ -1439,18 +1413,7 @@
                 touchMoved = false;
             }, { passive: true });
 
-            // Show controls on scroll start, hide after scroll ends
-            let scrollTimeout;
-            viewerContainer.addEventListener("scroll", () => {
-                showControls();
-                
-                clearTimeout(scrollTimeout);
-                scrollTimeout = setTimeout(() => {
-                    if (!document.getElementById("controls").classList.contains("hidden")) {
-                        hideControls();
-                    }
-                }, 2000);
-            });
+            // Don't show controls automatically on scroll - only on tap
 
             // Show controls initially on mobile
             setTimeout(() => {
@@ -1505,12 +1468,23 @@
             }
         }
 
+        // Zoom controls - now in menu
         document.getElementById("zoomIn").addEventListener("click", () => {
             applyZoom(zoomLevel + 25);
+            // Close menu after action
+            menuOpen = false;
+            menuItems.classList.remove("active");
+            menuToggle.classList.remove("active");
+            menuToggle.textContent = "☰";
         });
 
         document.getElementById("zoomOut").addEventListener("click", () => {
             applyZoom(zoomLevel - 25);
+            // Close menu after action
+            menuOpen = false;
+            menuItems.classList.remove("active");
+            menuToggle.classList.remove("active");
+            menuToggle.textContent = "☰";
         });
 
         document.getElementById("zoomFit").addEventListener("click", () => {
@@ -1519,11 +1493,21 @@
             const standardPageWidth = 612;
             baseScale = containerWidth / standardPageWidth;
             applyZoom(100);
+            // Close menu after action
+            menuOpen = false;
+            menuItems.classList.remove("active");
+            menuToggle.classList.remove("active");
+            menuToggle.textContent = "☰";
         });
 
         document.getElementById("zoomReset").addEventListener("click", () => {
             baseScale = calculateScale();
             applyZoom(100);
+            // Close menu after action
+            menuOpen = false;
+            menuItems.classList.remove("active");
+            menuToggle.classList.remove("active");
+            menuToggle.textContent = "☰";
         });
 
         // Keyboard zoom
@@ -1970,10 +1954,6 @@
             
             // Reduce animation complexity
             document.documentElement.style.setProperty('--transition-speed', '0.2s');
-            
-            // Limit zoom controls visibility
-            const zoomControls = document.getElementById("zoomControls");
-            zoomControls.style.opacity = "0.7";
             
             // Add memory warning handler
             window.addEventListener("beforeunload", () => {
