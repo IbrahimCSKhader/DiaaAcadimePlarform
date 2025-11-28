@@ -23,6 +23,13 @@
             user-select: none;
         }
 
+        /* Allow text selection in text layers */
+        .textLayer, .textLayer * {
+            -webkit-user-select: text !important;
+            user-select: text !important;
+            -moz-user-select: text !important;
+        }
+
         #viewerContainer {
             width: 100%;
             height: 100vh;
@@ -48,6 +55,13 @@
             border-radius: 8px;
         }
 
+        /* Ensure text layer is selectable */
+        .page-wrapper .textLayer {
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+        }
+
         .pdf-canvas {
             margin: 0;
             border-radius: 8px;
@@ -58,6 +72,44 @@
             image-rendering: -webkit-optimize-contrast;
         }
 
+        /* Text Layer Container */
+        .textLayer {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            opacity: 1;
+            line-height: 1.0;
+            text-align: initial;
+            pointer-events: auto;
+            transform-origin: 0% 0%;
+            z-index: 2;
+        }
+
+        .textLayer > span {
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+            transform-origin: 0% 0%;
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+        }
+
+        .textLayer .highlight {
+            margin: -1px;
+            padding: 1px;
+            background-color: rgba(255, 235, 59, 0.3);
+            border-radius: 2px;
+        }
+
+        .textLayer .highlight.selected {
+            background-color: rgba(0, 100, 255, 0.3);
+        }
+
         .draw-canvas {
             position: absolute;
             top: 0;
@@ -65,6 +117,7 @@
             transform: translateX(-50%);
             pointer-events: auto;
             border-radius: 8px;
+            z-index: 3; /* Above text layer */
         }
 
         .draw-canvas.no-drawing {
@@ -248,6 +301,322 @@
             text-align: center;
         }
 
+        /* ============================================
+           ZOOM CONTROLS
+        ============================================ */
+        #zoomControls {
+            position: fixed;
+            bottom: 100px;
+            right: 30px;
+            z-index: 10002;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: rgba(0,0,0,0.85);
+            padding: 12px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        #zoomControls button {
+            width: 45px;
+            height: 45px;
+            border-radius: 8px;
+            border: none;
+            background: #3d5a80;
+            color: white;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        #zoomControls button:hover {
+            background: #2c4458;
+        }
+
+        #zoomLevel {
+            text-align: center;
+            color: #ccc;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        /* ============================================
+           THUMBNAIL SIDEBAR
+        ============================================ */
+        #thumbnailSidebar {
+            position: fixed;
+            left: -300px;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: rgba(26, 26, 26, 0.98);
+            z-index: 10003;
+            transition: left 0.3s ease;
+            overflow-y: auto;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+            padding: 80px 10px 20px;
+        }
+
+        #thumbnailSidebar.active {
+            left: 0;
+        }
+
+        #thumbnailSidebar h3 {
+            color: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            font-size: 18px;
+            border-bottom: 1px solid #444;
+        }
+
+        .thumbnail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            padding: 10px;
+        }
+
+        .thumbnail-item {
+            background: #2a2a2a;
+            border-radius: 6px;
+            padding: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .thumbnail-item:hover {
+            transform: scale(1.05);
+            background: #3a3a3a;
+        }
+
+        .thumbnail-item.active {
+            border-color: #3d5a80;
+            background: #3a3a3a;
+        }
+
+        .thumbnail-canvas {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+            background: white;
+        }
+
+        .thumbnail-page-num {
+            text-align: center;
+            color: #ccc;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        /* ============================================
+           SEARCH PANEL
+        ============================================ */
+        #searchPanel {
+            position: fixed;
+            top: 70px;
+            right: -400px;
+            width: 350px;
+            background: rgba(26, 26, 26, 0.98);
+            z-index: 10004;
+            transition: right 0.3s ease;
+            box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+            border-radius: 12px 0 0 12px;
+            padding: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        #searchPanel.active {
+            right: 0;
+        }
+
+        #searchInput {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #3d5a80;
+            border-radius: 8px;
+            background: #2a2a2a;
+            color: white;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        #searchInput:focus {
+            outline: none;
+            border-color: #5a7ba8;
+        }
+
+        .search-results {
+            margin-top: 15px;
+        }
+
+        .search-result-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #2a2a2a;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .search-result-item:hover {
+            background: #3a3a3a;
+        }
+
+        .search-result-item .page-num {
+            color: #3d5a80;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .search-result-item .context {
+            color: #ccc;
+            font-size: 12px;
+        }
+
+        .search-match {
+            background: #ffeb3b;
+            color: #000;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        /* ============================================
+           FULLSCREEN MODE
+        ============================================ */
+        body.fullscreen {
+            overflow: hidden;
+        }
+
+        body.fullscreen #viewerContainer {
+            padding: 0;
+            height: 100vh;
+        }
+
+        body.fullscreen #controls,
+        body.fullscreen #optionsMenu,
+        body.fullscreen #zoomControls {
+            opacity: 0.3;
+            transition: opacity 0.3s;
+        }
+
+        body.fullscreen #controls:hover,
+        body.fullscreen #optionsMenu:hover,
+        body.fullscreen #zoomControls:hover {
+            opacity: 1;
+        }
+
+        /* ============================================
+           NIGHT MODE
+        ============================================ */
+        body.night-mode {
+            background: #0a0a0a;
+        }
+
+        body.night-mode .page-wrapper {
+            background: #1a1a1a;
+        }
+
+        body.night-mode .pdf-canvas {
+            filter: invert(1) hue-rotate(180deg);
+        }
+
+        /* ============================================
+           TEXT SELECTION
+        ============================================ */
+        .text-selection-mode body {
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        .text-selection-mode .pdf-canvas {
+            cursor: text;
+        }
+
+        .highlight {
+            position: absolute;
+            background: rgba(255, 235, 59, 0.4);
+            border-radius: 2px;
+            pointer-events: none;
+        }
+
+        /* ============================================
+           READING PROGRESS
+        ============================================ */
+        #readingProgress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 3px;
+            background: linear-gradient(90deg, #3d5a80, #5a7ba8);
+            z-index: 10005;
+            transition: width 0.3s ease;
+        }
+
+        /* ============================================
+           STATISTICS PANEL
+        ============================================ */
+        #statsPanel {
+            position: fixed;
+            bottom: 100px;
+            left: 30px;
+            background: rgba(0,0,0,0.85);
+            padding: 15px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            z-index: 10006;
+            font-size: 12px;
+            color: #ccc;
+            min-width: 200px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        #statsPanel.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .stat-item {
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .stat-label {
+            color: #999;
+        }
+
+        .stat-value {
+            color: #3d5a80;
+            font-weight: 600;
+        }
+
+
+        /* ============================================
+           PAGE ROTATION
+        ============================================ */
+        .page-wrapper.rotated-90 {
+            transform: rotate(90deg);
+        }
+
+        .page-wrapper.rotated-180 {
+            transform: rotate(180deg);
+        }
+
+        .page-wrapper.rotated-270 {
+            transform: rotate(-90deg);
+        }
+
         @media (max-width: 768px) {
             #optionsMenu {
                 bottom: 20px;
@@ -303,12 +672,74 @@
         <button id="goBtn">Go</button>
     </div>
 
+    <!-- Reading Progress Bar -->
+    <div id="readingProgress"></div>
+
+    <!-- Thumbnail Sidebar -->
+    <div id="thumbnailSidebar">
+        <h3>📑 الصفحات</h3>
+        <div class="thumbnail-grid" id="thumbnailGrid"></div>
+    </div>
+
+    <!-- Search Panel -->
+    <div id="searchPanel">
+        <h3 style="color: white; margin-bottom: 15px;">🔍 البحث</h3>
+        <input type="text" id="searchInput" placeholder="ابحث في النص...">
+        <div class="search-results" id="searchResults"></div>
+    </div>
+
+    <!-- Statistics Panel -->
+    <div id="statsPanel">
+        <div class="stat-item">
+            <span class="stat-label">الصفحات المقروءة:</span>
+            <span class="stat-value" id="pagesRead">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">وقت القراءة:</span>
+            <span class="stat-value" id="readingTime">0 دقيقة</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">التقدم:</span>
+            <span class="stat-value" id="readingProgressPercent">0%</span>
+        </div>
+    </div>
+
+    <!-- Zoom Controls -->
+    <div id="zoomControls">
+        <button id="zoomIn" title="تكبير">➕</button>
+        <button id="zoomOut" title="تصغير">➖</button>
+        <button id="zoomFit" title="ملء الشاشة">⛶</button>
+        <button id="zoomReset" title="إعادة تعيين">↺</button>
+        <div id="zoomLevel">100%</div>
+    </div>
+
+
     <div id="optionsMenu">
         <button id="menuToggle">☰</button>
         <div id="menuItems">
             <div class="menu-item" id="toggleNav">
                 <span class="menu-item-icon">🧭</span>
                 <span>Navigation</span>
+            </div>
+            <div class="menu-item" id="toggleThumbnails">
+                <span class="menu-item-icon">📑</span>
+                <span>Thumbnails</span>
+            </div>
+            <div class="menu-item" id="toggleSearch">
+                <span class="menu-item-icon">🔍</span>
+                <span>Search</span>
+            </div>
+            <div class="menu-item" id="toggleFullscreen">
+                <span class="menu-item-icon">⛶</span>
+                <span>Fullscreen</span>
+            </div>
+            <div class="menu-item" id="toggleNightMode">
+                <span class="menu-item-icon">🌙</span>
+                <span>Night Mode</span>
+            </div>
+            <div class="menu-item" id="toggleTextSelection">
+                <span class="menu-item-icon">📝</span>
+                <span>Text Selection</span>
             </div>
             <div class="menu-item" id="penTool">
                 <span class="menu-item-icon">✏️</span>
@@ -317,6 +748,18 @@
             <div class="menu-item" id="eraserTool">
                 <span class="menu-item-icon">🧹</span>
                 <span>Eraser</span>
+            </div>
+            <div class="menu-item" id="rotatePage">
+                <span class="menu-item-icon">🔄</span>
+                <span>Rotate</span>
+            </div>
+            <div class="menu-item" id="downloadPdf">
+                <span class="menu-item-icon">💾</span>
+                <span>Download</span>
+            </div>
+            <div class="menu-item" id="toggleStats">
+                <span class="menu-item-icon">📊</span>
+                <span>Statistics</span>
             </div>
         </div>
     </div>
@@ -385,19 +828,23 @@
             
             let scale = availableWidth / standardPageWidth;
             
-            // Optimize for different devices
+            // Enhanced scale for high resolution rendering
+            // iOS: More conservative to maintain performance
             if (isIOSSafari) {
-                scale = Math.min(scale, 1.0);
+                scale = Math.min(scale, 1.5); // Conservative: 1.5 for iOS (was 1.0, increased to 1.5)
             } else if (isAndroid) {
-                scale = Math.min(scale, 1.1);
+                scale = Math.min(scale, 2.2); // Increased from 1.1 to 2.2
             } else if (window.innerWidth > 1024) {
-                scale = Math.min(scale, 1.8);
+                scale = Math.min(scale, 3.0); // Increased from 1.8 to 3.0
+            } else if (window.innerWidth > 768) {
+                scale = Math.min(scale, 2.5); // Added for tablets
             }
             
-            return Math.max(scale, 0.6);
+            return Math.max(scale, 1.0); // Increased minimum from 0.6 to 1.0
         }
-        
+
         let scale = calculateScale();
+        let baseScale = scale;
         let pdfDoc = null;
         let currentPage = 1;
         let drawingMode = 'none';
@@ -407,28 +854,41 @@
         let pagePromises = new Map();
         let activeRendering = 0;
         
-        // Smart rendering based on device
+        // Advanced features state
+        let zoomLevel = 100;
+        let isFullscreen = false;
+        let isNightMode = false;
+        let textSelectionMode = false;
+        let pageRotations = new Map(); // Store rotation for each page
+        let readingStartTime = Date.now();
+        let pagesReadSet = new Set();
+        let searchResults = [];
+        let currentSearchIndex = -1;
+        
+        // Smart rendering based on device - Enhanced for high resolution
         let maxConcurrentRenders = 1;
         let pixelRatio = window.devicePixelRatio || 1;
         let maxImageSize = 512 * 512;
         
+        // Increase pixel ratio for high resolution rendering
+        // iOS: More conservative to avoid memory issues
         if (isIOSSafari) {
             maxConcurrentRenders = 1;
-            pixelRatio = 1.0;
-            maxImageSize = 512 * 512;
+            pixelRatio = Math.min(Math.max(pixelRatio, 1.5), 2.0); // Conservative: 1.5-2.0 for iOS
+            maxImageSize = 768 * 768; // Moderate increase for iOS
         } else if (isAndroid || isLowEndDevice) {
             maxConcurrentRenders = 1;
-            pixelRatio = Math.min(pixelRatio, 1.5);
-            maxImageSize = 768 * 768;
+            pixelRatio = Math.max(pixelRatio, 2.0); // Increased from 1.5 to 2.0
+            maxImageSize = 1024 * 1024; // Increased from 768*768
         } else if (isMobile) {
             maxConcurrentRenders = 2;
-            pixelRatio = Math.min(pixelRatio, 1.5);
-            maxImageSize = 1024 * 1024;
+            pixelRatio = Math.max(pixelRatio, 2.5); // Increased from 1.5 to 2.5
+            maxImageSize = 1536 * 1536; // Increased from 1024*1024
         } else {
-            // Desktop
+            // Desktop - High resolution
             maxConcurrentRenders = 3;
-            pixelRatio = Math.min(pixelRatio, 2.0);
-            maxImageSize = 2048 * 2048;
+            pixelRatio = Math.max(pixelRatio, 3.0); // Increased from 2.0 to 3.0 for ultra high res
+            maxImageSize = 4096 * 4096; // Increased from 2048*2048
         }
         
         const loadingTask = pdfjsLib.getDocument({
@@ -455,6 +915,11 @@
             setupNavigation();
             document.getElementById("loader").style.display = "none";
             updatePageInfo();
+            updateReadingStats();
+            
+            // Initialize base scale
+            baseScale = calculateScale();
+            applyZoom(100);
         }).catch(err => {
             console.error("PDF.js Error:", err);
             document.getElementById("loader").innerHTML = "Failed to load PDF.<br>Please try again or use desktop.";
@@ -504,46 +969,120 @@
                     if (renderedPages.has(pageNum)) return;
 
                     const page = await pdfDoc.getPage(pageNum);
-                    const viewport = page.getViewport({ scale });
+                    // Use enhanced scale for high resolution rendering
+                    const viewport = page.getViewport({ scale: scale });
 
                     const pageWrapper = pageWrappers.get(pageNum);
                     if (!pageWrapper) return;
 
                     pageWrapper.innerHTML = "";
                     pageWrapper.style.minHeight = "";
-
-                    const pdfCanvas = document.createElement("canvas");
-                    pdfCanvas.className = "pdf-canvas";
-                    
+                
+                const pdfCanvas = document.createElement("canvas");
+                pdfCanvas.className = "pdf-canvas";
+                
+                    // High resolution canvas rendering
                     pdfCanvas.width = Math.floor(viewport.width * pixelRatio);
                     pdfCanvas.height = Math.floor(viewport.height * pixelRatio);
-                    pdfCanvas.style.width = viewport.width + "px";
-                    pdfCanvas.style.height = viewport.height + "px";
+                pdfCanvas.style.width = viewport.width + "px";
+                pdfCanvas.style.height = viewport.height + "px";
 
                     const ctx = pdfCanvas.getContext("2d", { alpha: false });
                     ctx.scale(pixelRatio, pixelRatio);
-                    
-                    await page.render({
-                        canvasContext: ctx,
-                        viewport: viewport
-                    }).promise;
+                
+                await page.render({
+                    canvasContext: ctx,
+                    viewport: viewport
+                }).promise;
 
-                    const drawCanvas = document.createElement("canvas");
-                    drawCanvas.className = "draw-canvas";
+                // Create text layer container
+                const textLayerDiv = document.createElement("div");
+                textLayerDiv.className = "textLayer";
+                textLayerDiv.style.width = viewport.width + "px";
+                textLayerDiv.style.height = viewport.height + "px";
+                textLayerDiv.style.left = "50%";
+                textLayerDiv.style.transform = "translateX(-50%)";
+                textLayerDiv.style.position = "absolute";
+                textLayerDiv.style.top = "0";
+
+                // Render text layer for selectable text
+                const textContent = await page.getTextContent();
+                const textItems = textContent.items;
+                
+                // On iOS, limit text items to prevent performance issues
+                const maxTextItems = isIOSSafari ? 500 : textItems.length;
+                const itemsToRender = textItems.slice(0, maxTextItems);
+                
+                // Create text layer using PDF.js text layer rendering
+                // This creates selectable, searchable text overlays
+                for (let i = 0; i < itemsToRender.length; i++) {
+                    const textItem = itemsToRender[i];
                     
+                    // Transform coordinates from PDF space to viewport space
+                    // textItem.transform is [a, b, c, d, e, f] where:
+                    // - [a, b, c, d] is the transformation matrix
+                    // - [e, f] is the translation
+                    const transform = textItem.transform;
+                    const scaleX = Math.hypot(transform[0], transform[1]);
+                    const scaleY = Math.hypot(transform[2], transform[3]);
+                    const angle = Math.atan2(transform[1], transform[0]);
+                    
+                    // Calculate position in viewport coordinates
+                    const tx = transform[4];
+                    const ty = transform[5];
+                    
+                    // Create text span element
+                    const textDiv = document.createElement("span");
+                    textDiv.textContent = textItem.str;
+                    
+                    // Position the text span (PDF coordinates are bottom-up, CSS is top-down)
+                    textDiv.style.left = tx + "px";
+                    textDiv.style.top = (viewport.height - ty) + "px";
+                    textDiv.style.fontSize = scaleY + "px";
+                    textDiv.style.fontFamily = textItem.fontName || "sans-serif";
+                    textDiv.style.width = (textItem.width || scaleX * textItem.str.length) + "px";
+                    textDiv.style.height = scaleY + "px";
+                    
+                    // Apply rotation if needed
+                    if (Math.abs(angle) > 0.001) {
+                        textDiv.style.transform = `rotate(${angle}rad)`;
+                        textDiv.style.transformOrigin = "0% 0%";
+                    }
+                    
+                    // Style for text selection
+                    textDiv.style.position = "absolute";
+                    textDiv.style.whiteSpace = "pre";
+                    textDiv.style.cursor = "text";
+                    textDiv.style.color = "transparent";
+                    textDiv.style.userSelect = "text";
+                    textDiv.style.webkitUserSelect = "text";
+                    textDiv.style.mozUserSelect = "text";
+                    textDiv.style.msUserSelect = "text";
+                    textDiv.style.lineHeight = "1.0";
+                    textDiv.style.overflow = "hidden";
+                    
+                    // Add to text layer
+                    textLayerDiv.appendChild(textDiv);
+                }
+
+                const drawCanvas = document.createElement("canvas");
+                drawCanvas.className = "draw-canvas";
+                
                     drawCanvas.width = Math.floor(viewport.width * pixelRatio);
                     drawCanvas.height = Math.floor(viewport.height * pixelRatio);
-                    drawCanvas.style.width = viewport.width + "px";
-                    drawCanvas.style.height = viewport.height + "px";
-                    
-                    const drawCtx = drawCanvas.getContext("2d");
+                drawCanvas.style.width = viewport.width + "px";
+                drawCanvas.style.height = viewport.height + "px";
+                
+                const drawCtx = drawCanvas.getContext("2d");
                     drawCtx.scale(pixelRatio, pixelRatio);
 
-                    pageWrapper.appendChild(pdfCanvas);
-                    pageWrapper.appendChild(drawCanvas);
+                // Append elements in correct z-order: canvas (bottom), text layer (middle), draw canvas (top)
+                pageWrapper.appendChild(pdfCanvas);
+                pageWrapper.appendChild(textLayerDiv);
+                pageWrapper.appendChild(drawCanvas);
 
                     drawCanvases.set(pageNum, drawCanvas);
-                    enableDrawing(drawCanvas);
+                enableDrawing(drawCanvas);
                     renderedPages.add(pageNum);
 
                     // Clean up memory on iOS periodically
@@ -639,8 +1178,8 @@
                     ctx.lineJoin = 'round';
                 }
 
-                ctx.lineTo(coords.x, coords.y);
-                ctx.stroke();
+                    ctx.lineTo(coords.x, coords.y);
+                    ctx.stroke();
             }
 
             function stopDrawing(e) {
@@ -713,32 +1252,34 @@
                 });
 
                 updatePageInfo();
+                updateActiveThumbnail();
+                updateReadingStats();
             }, 150);
         });
 
         function setupNavigation() {
             document.getElementById("nextBtn").onclick = () => {
-                if (pdfDoc && currentPage < pdfDoc.numPages) {
-                    scrollToPage(currentPage + 1);
-                }
-            };
+                    if (pdfDoc && currentPage < pdfDoc.numPages) {
+                        scrollToPage(currentPage + 1);
+                    }
+                };
 
             document.getElementById("prevBtn").onclick = () => {
-                if (pdfDoc && currentPage > 1) {
-                    scrollToPage(currentPage - 1);
-                }
-            };
+                    if (pdfDoc && currentPage > 1) {
+                        scrollToPage(currentPage - 1);
+                    }
+                };
 
             document.getElementById("goBtn").onclick = () => {
                 const p = parseInt(document.getElementById("jumpPage").value);
                 if (pdfDoc && p >= 1 && p <= pdfDoc.numPages) {
-                    scrollToPage(p);
+                        scrollToPage(p);
                     document.getElementById("jumpPage").value = "";
-                }
-            };
+                    }
+                };
 
             document.getElementById("jumpPage").addEventListener("keypress", (e) => {
-                if (e.key === "Enter") {
+                    if (e.key === "Enter") {
                     document.getElementById("goBtn").click();
                 }
             });
@@ -772,6 +1313,552 @@
             updateDrawingMode();
             document.getElementById("eraserTool").classList.toggle("active", drawingMode === 'eraser');
         });
+
+        // ============================================
+        // ZOOM CONTROLS
+        // ============================================
+        function applyZoom(newZoom) {
+            // Enhanced zoom limits for high resolution
+            const maxZoom = isIOSSafari ? 200 : 400; // Increased from 150/300
+            const minZoom = isIOSSafari ? 75 : 50;
+            
+            zoomLevel = Math.max(minZoom, Math.min(maxZoom, newZoom));
+            scale = baseScale * (zoomLevel / 100);
+            document.getElementById("zoomLevel").textContent = zoomLevel + "%";
+            
+            // On iOS, only re-render visible pages to save memory
+            if (isIOSSafari) {
+                // Only re-render current page and adjacent pages
+                const pagesToRender = [currentPage];
+                if (currentPage > 1) pagesToRender.push(currentPage - 1);
+                if (currentPage < pdfDoc.numPages) pagesToRender.push(currentPage + 1);
+                
+                pagesToRender.forEach(pageNum => {
+                    if (renderedPages.has(pageNum)) {
+                        renderedPages.delete(pageNum); // Force re-render
+                        renderPage(pageNum);
+                    }
+                });
+            } else {
+                // Re-render all rendered pages with new scale
+                const pagesToReRender = Array.from(renderedPages);
+                renderedPages.clear(); // Clear to force re-render
+                pagesToReRender.forEach(pageNum => {
+                    renderPage(pageNum);
+                });
+            }
+        }
+
+        document.getElementById("zoomIn").addEventListener("click", () => {
+            applyZoom(zoomLevel + 25);
+        });
+
+        document.getElementById("zoomOut").addEventListener("click", () => {
+            applyZoom(zoomLevel - 25);
+        });
+
+        document.getElementById("zoomFit").addEventListener("click", () => {
+            const container = document.getElementById("viewerContainer");
+            const containerWidth = container.clientWidth - 40;
+            const standardPageWidth = 612;
+            baseScale = containerWidth / standardPageWidth;
+            applyZoom(100);
+        });
+
+        document.getElementById("zoomReset").addEventListener("click", () => {
+            baseScale = calculateScale();
+            applyZoom(100);
+        });
+
+        // Keyboard zoom
+        document.addEventListener("keydown", (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === "=" || e.key === "+") {
+                    e.preventDefault();
+                    applyZoom(zoomLevel + 25);
+                } else if (e.key === "-") {
+                    e.preventDefault();
+                    applyZoom(zoomLevel - 25);
+                } else if (e.key === "0") {
+                    e.preventDefault();
+                    baseScale = calculateScale();
+                    applyZoom(100);
+                }
+            }
+        });
+
+        // ============================================
+        // THUMBNAIL SIDEBAR
+        // ============================================
+        async function generateThumbnails() {
+            const thumbnailGrid = document.getElementById("thumbnailGrid");
+            thumbnailGrid.innerHTML = "";
+
+            // On iOS, generate thumbnails lazily to save memory
+            const batchSize = isIOSSafari ? 5 : 10;
+            const delay = isIOSSafari ? 200 : 50;
+
+            for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+                // Create placeholder first
+                const thumbnailItem = document.createElement("div");
+                thumbnailItem.className = "thumbnail-item";
+                thumbnailItem.id = `thumb-${pageNum}`;
+                if (pageNum === currentPage) {
+                    thumbnailItem.classList.add("active");
+                }
+
+                const placeholder = document.createElement("div");
+                placeholder.style.cssText = "width:100%;height:120px;background:#2a2a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#666;font-size:12px;";
+                placeholder.textContent = `صفحة ${pageNum}`;
+                thumbnailItem.appendChild(placeholder);
+
+                const pageNumLabel = document.createElement("div");
+                pageNumLabel.className = "thumbnail-page-num";
+                pageNumLabel.textContent = `صفحة ${pageNum}`;
+                thumbnailItem.appendChild(pageNumLabel);
+
+                thumbnailItem.addEventListener("click", () => {
+                    scrollToPage(pageNum);
+                });
+
+                thumbnailGrid.appendChild(thumbnailItem);
+
+                // Generate thumbnail asynchronously
+                (async (pNum) => {
+                    try {
+                        // Delay for iOS to prevent memory issues
+                        if (pNum % batchSize === 0 && isIOSSafari) {
+                            await new Promise(r => setTimeout(r, delay));
+                        }
+
+                        const page = await pdfDoc.getPage(pNum);
+                        const thumbScale = isIOSSafari ? 0.15 : 0.2; // Smaller on iOS
+                        const viewport = page.getViewport({ scale: thumbScale });
+                        
+                        const thumbCanvas = document.createElement("canvas");
+                        thumbCanvas.className = "thumbnail-canvas";
+                        thumbCanvas.width = viewport.width;
+                        thumbCanvas.height = viewport.height;
+                        
+                        const ctx = thumbCanvas.getContext("2d", { alpha: false });
+                        await page.render({
+                            canvasContext: ctx,
+                            viewport: viewport
+                        }).promise;
+
+                        // Replace placeholder with actual thumbnail
+                        placeholder.replaceWith(thumbCanvas);
+                    } catch (err) {
+                        console.error(`Error generating thumbnail for page ${pNum}:`, err);
+                        placeholder.textContent = "خطأ";
+                        placeholder.style.color = "#f00";
+                    }
+                })(pageNum);
+            }
+        }
+
+        document.getElementById("toggleThumbnails").addEventListener("click", () => {
+            const sidebar = document.getElementById("thumbnailSidebar");
+            sidebar.classList.toggle("active");
+            document.getElementById("toggleThumbnails").classList.toggle("active");
+            
+            if (sidebar.classList.contains("active") && thumbnailGrid.children.length === 0) {
+                generateThumbnails();
+            }
+        });
+
+        // Update active thumbnail on page change
+        function updateActiveThumbnail() {
+            document.querySelectorAll(".thumbnail-item").forEach(item => {
+                item.classList.remove("active");
+            });
+            const activeThumb = document.getElementById(`thumb-${currentPage}`);
+            if (activeThumb) {
+                activeThumb.classList.add("active");
+                activeThumb.scrollIntoView({ block: "nearest" });
+            }
+        }
+
+        // ============================================
+        // SEARCH FUNCTIONALITY
+        // ============================================
+        async function searchInPDF(query) {
+            if (!query || !pdfDoc) return;
+            
+            searchResults = [];
+            currentSearchIndex = -1;
+            const resultsContainer = document.getElementById("searchResults");
+            resultsContainer.innerHTML = '<div style="color: #999; padding: 20px; text-align: center;">جاري البحث...</div>';
+
+            // On iOS, limit search to prevent memory issues
+            const maxSearchPages = isIOSSafari ? 50 : pdfDoc.numPages;
+            const searchDelay = isIOSSafari ? 100 : 0;
+
+            for (let pageNum = 1; pageNum <= Math.min(maxSearchPages, pdfDoc.numPages); pageNum++) {
+                try {
+                    // Add delay on iOS to prevent blocking
+                    if (pageNum % 10 === 0 && isIOSSafari) {
+                        await new Promise(r => setTimeout(r, searchDelay));
+                    }
+
+                    const page = await pdfDoc.getPage(pageNum);
+                    const textContent = await page.getTextContent();
+                    const textItems = textContent.items;
+                    const fullText = textItems.map(item => item.str).join(" ");
+                    
+                    if (fullText.toLowerCase().includes(query.toLowerCase())) {
+                        const matches = [];
+                        let searchIndex = 0;
+                        const lowerQuery = query.toLowerCase();
+                        const lowerText = fullText.toLowerCase();
+                        
+                        // Limit matches per page on iOS
+                        const maxMatchesPerPage = isIOSSafari ? 5 : 20;
+                        let matchCount = 0;
+                        
+                        while ((searchIndex = lowerText.indexOf(lowerQuery, searchIndex)) !== -1 && matchCount < maxMatchesPerPage) {
+                            const start = Math.max(0, searchIndex - 30);
+                            const end = Math.min(fullText.length, searchIndex + query.length + 30);
+                            const context = fullText.substring(start, end);
+                            
+                            matches.push({
+                                page: pageNum,
+                                index: searchIndex,
+                                context: context
+                            });
+                            searchIndex += query.length;
+                            matchCount++;
+                        }
+
+                        matches.forEach(match => {
+                            searchResults.push(match);
+                            
+                            const resultItem = document.createElement("div");
+                            resultItem.className = "search-result-item";
+                            resultItem.innerHTML = `
+                                <div class="page-num">صفحة ${match.page}</div>
+                                <div class="context">${match.context.replace(
+                                    new RegExp(query, "gi"),
+                                    `<span class="search-match">$&</span>`
+                                )}</div>
+                            `;
+                            
+                            resultItem.addEventListener("click", () => {
+                                scrollToPage(match.page);
+                                highlightSearchMatch(match.page, match.index);
+                            });
+                            
+                            resultsContainer.appendChild(resultItem);
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Error searching page ${pageNum}:`, err);
+                }
+            }
+
+            if (searchResults.length === 0) {
+                resultsContainer.innerHTML = '<div style="color: #999; padding: 20px; text-align: center;">لا توجد نتائج</div>';
+            } else if (isIOSSafari && maxSearchPages < pdfDoc.numPages) {
+                resultsContainer.innerHTML += `<div style="color: #999; padding: 10px; text-align: center; font-size: 11px;">تم البحث في أول ${maxSearchPages} صفحة فقط</div>`;
+            }
+        }
+
+        function highlightSearchMatch(pageNum, index) {
+            // Scroll to page and highlight (simplified version)
+            scrollToPage(pageNum);
+        }
+
+        document.getElementById("toggleSearch").addEventListener("click", () => {
+            const panel = document.getElementById("searchPanel");
+            panel.classList.toggle("active");
+            document.getElementById("toggleSearch").classList.toggle("active");
+            if (panel.classList.contains("active")) {
+                document.getElementById("searchInput").focus();
+            }
+        });
+
+        let searchTimeout;
+        document.getElementById("searchInput").addEventListener("input", (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchInPDF(e.target.value);
+            }, 500);
+        });
+
+        // ============================================
+        // FULLSCREEN MODE
+        // ============================================
+        function toggleFullscreen() {
+            if (!isFullscreen) {
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else if (document.documentElement.webkitRequestFullscreen) {
+                    document.documentElement.webkitRequestFullscreen();
+                } else if (document.documentElement.msRequestFullscreen) {
+                    document.documentElement.msRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+            }
+        }
+
+        document.getElementById("toggleFullscreen").addEventListener("click", toggleFullscreen);
+
+        document.addEventListener("fullscreenchange", () => {
+            isFullscreen = !!document.fullscreenElement;
+            document.body.classList.toggle("fullscreen", isFullscreen);
+            document.getElementById("toggleFullscreen").classList.toggle("active", isFullscreen);
+        });
+
+        // ============================================
+        // NIGHT MODE
+        // ============================================
+        document.getElementById("toggleNightMode").addEventListener("click", () => {
+            isNightMode = !isNightMode;
+            document.body.classList.toggle("night-mode", isNightMode);
+            document.getElementById("toggleNightMode").classList.toggle("active", isNightMode);
+            localStorage.setItem("pdfNightMode", isNightMode);
+        });
+
+        // Load saved night mode preference
+        if (localStorage.getItem("pdfNightMode") === "true") {
+            isNightMode = true;
+            document.body.classList.add("night-mode");
+            document.getElementById("toggleNightMode").classList.add("active");
+        }
+
+        // ============================================
+        // TEXT SELECTION MODE
+        // ============================================
+        document.getElementById("toggleTextSelection").addEventListener("click", () => {
+            textSelectionMode = !textSelectionMode;
+            document.body.classList.toggle("text-selection-mode", textSelectionMode);
+            document.getElementById("toggleTextSelection").classList.toggle("active", textSelectionMode);
+            
+            // Enable/disable text selection on text layers
+            document.querySelectorAll('.textLayer').forEach(textLayer => {
+                if (textSelectionMode) {
+                    textLayer.style.pointerEvents = 'auto';
+                    textLayer.style.userSelect = 'text';
+                    textLayer.style.webkitUserSelect = 'text';
+                } else {
+                    textLayer.style.pointerEvents = 'auto'; // Keep enabled for text selection
+                    textLayer.style.userSelect = 'text'; // Always allow text selection
+                    textLayer.style.webkitUserSelect = 'text';
+                }
+            });
+            
+            if (textSelectionMode) {
+                drawingMode = 'none';
+                updateDrawingMode();
+            }
+        });
+
+        // ============================================
+        // PAGE ROTATION
+        // ============================================
+        document.getElementById("rotatePage").addEventListener("click", () => {
+            const currentRotation = pageRotations.get(currentPage) || 0;
+            const newRotation = (currentRotation + 90) % 360;
+            pageRotations.set(currentPage, newRotation);
+            
+            const pageWrapper = pageWrappers.get(currentPage);
+            if (pageWrapper) {
+                pageWrapper.className = "page-wrapper";
+                if (newRotation === 90) {
+                    pageWrapper.classList.add("rotated-90");
+                } else if (newRotation === 180) {
+                    pageWrapper.classList.add("rotated-180");
+                } else if (newRotation === 270) {
+                    pageWrapper.classList.add("rotated-270");
+                }
+            }
+        });
+
+        // ============================================
+        // DOWNLOAD & PRINT
+        // ============================================
+        document.getElementById("downloadPdf").addEventListener("click", () => {
+            window.open(url, '_blank');
+        });
+
+        // ============================================
+        // READING STATISTICS
+        // ============================================
+        function updateReadingStats() {
+            const readingTime = Math.floor((Date.now() - readingStartTime) / 60000);
+            const progress = Math.round((pagesReadSet.size / pdfDoc.numPages) * 100);
+            
+            document.getElementById("pagesRead").textContent = pagesReadSet.size;
+            document.getElementById("readingTime").textContent = readingTime + " دقيقة";
+            document.getElementById("readingProgressPercent").textContent = progress + "%";
+            
+            // Update progress bar
+            document.getElementById("readingProgress").style.width = progress + "%";
+        }
+
+        // Track pages read
+        document.getElementById("viewerContainer").addEventListener("scroll", () => {
+            pagesReadSet.add(currentPage);
+            updateReadingStats();
+        });
+
+        document.getElementById("toggleStats").addEventListener("click", () => {
+            const statsPanel = document.getElementById("statsPanel");
+            statsPanel.classList.toggle("active");
+            document.getElementById("toggleStats").classList.toggle("active");
+            if (statsPanel.classList.contains("active")) {
+                updateReadingStats();
+            }
+        });
+
+        // ============================================
+        // ADDITIONAL ENHANCEMENTS
+        // ============================================
+        
+        // Double-click to zoom
+        document.getElementById("viewerContainer").addEventListener("dblclick", (e) => {
+            if (e.target.classList.contains("pdf-canvas")) {
+                if (zoomLevel === 100) {
+                    applyZoom(150);
+                } else {
+                    baseScale = calculateScale();
+                    applyZoom(100);
+                }
+            }
+        });
+
+        // Pinch zoom on touch devices
+        let lastTouchDistance = 0;
+        document.getElementById("viewerContainer").addEventListener("touchstart", (e) => {
+            if (e.touches.length === 2) {
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                lastTouchDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+            }
+        });
+
+        document.getElementById("viewerContainer").addEventListener("touchmove", (e) => {
+            if (e.touches.length === 2) {
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                const currentDistance = Math.hypot(
+                    touch2.clientX - touch1.clientX,
+                    touch2.clientY - touch1.clientY
+                );
+                
+                if (lastTouchDistance > 0) {
+                    const delta = currentDistance - lastTouchDistance;
+                    if (Math.abs(delta) > 10) {
+                        applyZoom(zoomLevel + (delta > 0 ? 5 : -5));
+                        lastTouchDistance = currentDistance;
+                    }
+                }
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener("keydown", (e) => {
+            if (e.target.tagName === "INPUT") return;
+            
+            switch(e.key) {
+                case "ArrowRight":
+                case "ArrowDown":
+                    e.preventDefault();
+                    if (pdfDoc && currentPage < pdfDoc.numPages) {
+                        scrollToPage(currentPage + 1);
+                    }
+                    break;
+                case "ArrowLeft":
+                case "ArrowUp":
+                    e.preventDefault();
+                    if (pdfDoc && currentPage > 1) {
+                        scrollToPage(currentPage - 1);
+                    }
+                    break;
+                case "Home":
+                    e.preventDefault();
+                    scrollToPage(1);
+                    break;
+                case "End":
+                    e.preventDefault();
+                    if (pdfDoc) scrollToPage(pdfDoc.numPages);
+                    break;
+                case "f":
+                case "F":
+                    if (!e.ctrlKey && !e.metaKey) {
+                        e.preventDefault();
+                        toggleFullscreen();
+                    }
+                    break;
+                case "Escape":
+                    if (isFullscreen) {
+                        toggleFullscreen();
+                    }
+                    break;
+            }
+        });
+
+        // Initialize zoom level display
+        document.getElementById("zoomLevel").textContent = zoomLevel + "%";
+        
+        // ============================================
+        // iOS-SPECIFIC OPTIMIZATIONS
+        // ============================================
+        if (isIOSSafari) {
+            // Disable heavy features on iOS
+            document.getElementById("toggleThumbnails").style.display = "none"; // Hide thumbnails on iOS initially
+            document.getElementById("toggleSearch").style.display = "none"; // Hide search on iOS initially
+            
+            // Reduce animation complexity
+            document.documentElement.style.setProperty('--transition-speed', '0.2s');
+            
+            // Limit zoom controls visibility
+            const zoomControls = document.getElementById("zoomControls");
+            zoomControls.style.opacity = "0.7";
+            
+            // Add memory warning handler
+            window.addEventListener("beforeunload", () => {
+                // Clean up canvases
+                drawCanvases.forEach(canvas => {
+                    if (canvas && canvas.width) {
+                        canvas.width = 0;
+                        canvas.height = 0;
+                    }
+                });
+            });
+
+            // Periodic memory cleanup on iOS
+            setInterval(() => {
+                if (renderedPages.size > 10) {
+                    // Keep only recent 10 pages in memory
+                    const pagesArray = Array.from(renderedPages).sort((a, b) => b - a);
+                    const pagesToRemove = pagesArray.slice(10);
+                    
+                    pagesToRemove.forEach(pageNum => {
+                        const wrapper = pageWrappers.get(pageNum);
+                        if (wrapper && Math.abs(pageNum - currentPage) > 5) {
+                            // Remove canvas data but keep wrapper
+                            const canvas = drawCanvases.get(pageNum);
+                            if (canvas) {
+                                const ctx = canvas.getContext("2d");
+                                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            }
+                            renderedPages.delete(pageNum);
+                        }
+                    });
+                }
+            }, 30000); // Every 30 seconds
+        }
     </script>
 
 </body>
