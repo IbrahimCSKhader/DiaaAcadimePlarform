@@ -54,10 +54,8 @@
 
         .page-wrapper {
             position: relative;
-            margin: 20px 0; /* Increased base margin for better separation */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            margin: 30px 0; /* Increased base margin for better separation */
+            display: block; /* Changed from flex to block for better spacing control */
             width: 100%;
             max-width: 100%;
             background: #2a2a2a;
@@ -72,6 +70,12 @@
             isolation: isolate;
             /* Ensure minimum spacing between pages */
             min-height: fit-content;
+            /* Center content */
+            text-align: center;
+        }
+        
+        .page-wrapper > * {
+            margin: 0 auto; /* Center all children */
         }
 
         /* When zoomed, allow horizontal scrolling and increase spacing */
@@ -1158,16 +1162,18 @@
                     pageWrapper.style.maxWidth = "none";
                     // Calculate proper margin to prevent overlap
                     // Use minimum margin that scales with zoom to ensure separation
-                    const baseMargin = 20; // Base margin in pixels
-                    // Scale margin proportionally with zoom to maintain separation
-                    const scaledMargin = baseMargin * currentZoomFactor;
-                    // Add extra buffer to ensure no overlap
-                    const extraBuffer = 10; // Extra pixels for safety
-                    const totalMargin = scaledMargin + extraBuffer;
+                    // Calculate margin based on actual scaled height to prevent overlap
+                    const baseMargin = 40; // Minimum margin (increased significantly)
+                    const scaledHeight = viewport.height * currentZoomFactor;
+                    // Use a larger percentage of height for margin to ensure separation
+                    const heightBasedMargin = scaledHeight * 0.05; // 5% of scaled height as margin
+                    // Take the maximum to ensure adequate spacing
+                    const totalMargin = Math.max(baseMargin * currentZoomFactor, heightBasedMargin + baseMargin);
                     
                     // Apply margin to ensure pages never overlap
                     pageWrapper.style.marginTop = totalMargin + "px";
                     pageWrapper.style.marginBottom = totalMargin + "px";
+                    pageWrapper.style.minHeight = (scaledHeight + (totalMargin * 2)) + "px"; // Include margins in min-height
                 } else {
                     pageWrapper.style.width = "";
                     pageWrapper.style.minWidth = "";
@@ -1670,21 +1676,30 @@
                                 wrapper.style.maxWidth = "none";
                             }
                             
-                            // Calculate proper margin to prevent overlap
-                            // Use minimum margin that scales with zoom to ensure separation
-                            const baseMargin = 20; // Base margin in pixels
-                            // Scale margin proportionally with zoom to maintain separation
-                            const scaledMargin = baseMargin * zoomFactor;
-                            // Add extra buffer to ensure no overlap
-                            const extraBuffer = 10; // Extra pixels for safety
-                            const totalMargin = scaledMargin + extraBuffer;
+                            // Calculate margin based on actual scaled height to prevent overlap
+                            // Get the actual height of the page after scaling
+                            const canvas = wrapper.querySelector('.pdf-canvas');
+                            let actualHeight = baseHeight;
+                            if (canvas) {
+                                actualHeight = parseFloat(canvas.style.height) || canvas.offsetHeight;
+                            }
+                            
+                            // Calculate margin: ensure minimum spacing + percentage of scaled height
+                            // This ensures pages never overlap regardless of zoom level
+                            const baseMargin = 40; // Minimum margin (increased significantly)
+                            const scaledHeight = actualHeight * zoomFactor;
+                            // Use a larger percentage of height for margin to ensure separation
+                            const heightBasedMargin = scaledHeight * 0.05; // 5% of scaled height as margin
+                            // Take the maximum to ensure adequate spacing
+                            const totalMargin = Math.max(baseMargin * zoomFactor, heightBasedMargin + baseMargin);
                             
                             // Apply margin to ensure pages never overlap
                             wrapper.style.marginTop = totalMargin + "px";
                             wrapper.style.marginBottom = totalMargin + "px";
                             
-                            // Ensure wrapper has proper spacing
+                            // Ensure wrapper has proper spacing and doesn't collapse
                             wrapper.style.display = "block";
+                            wrapper.style.minHeight = (scaledHeight + (totalMargin * 2)) + "px"; // Include margins in min-height
                         } else {
                             wrapper.classList.remove("zoomed");
                             wrapper.style.width = "";
