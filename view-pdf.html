@@ -180,6 +180,11 @@
             transform: translateX(-50%) translateY(-10px);
         }
 
+        /* Auto-hide controls on mobile after inactivity */
+        #controls.auto-hide {
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
         #controls button {
             padding: 8px 16px;
             font-size: 14px;
@@ -753,10 +758,6 @@
                 <span class="menu-item-icon">🔄</span>
                 <span>Rotate</span>
             </div>
-            <div class="menu-item" id="downloadPdf">
-                <span class="menu-item-icon">💾</span>
-                <span>Download</span>
-            </div>
             <div class="menu-item" id="toggleStats">
                 <span class="menu-item-icon">📊</span>
                 <span>Statistics</span>
@@ -1302,6 +1303,161 @@
             document.getElementById("toggleNav").classList.toggle("active");
         });
 
+        // ============================================
+        // TOUCH TO TOGGLE CONTROLS (Mobile)
+        // ============================================
+        let controlsAutoHideTimeout = null;
+        let lastTouchTime = 0;
+        let touchStartY = 0;
+        let touchStartX = 0;
+        const TOUCH_DELAY = 300; // Delay to distinguish tap from scroll/draw
+        const SWIPE_THRESHOLD = 30; // Minimum distance for swipe
+
+        function showControls() {
+            const controls = document.getElementById("controls");
+            controls.classList.remove("hidden");
+            controls.classList.add("auto-hide");
+            
+            // Clear existing timeout
+            if (controlsAutoHideTimeout) {
+                clearTimeout(controlsAutoHideTimeout);
+            }
+            
+            // Auto-hide after 3 seconds on mobile
+            if (isMobile) {
+                controlsAutoHideTimeout = setTimeout(() => {
+                    if (!controls.classList.contains("hidden")) {
+                        controls.classList.add("hidden");
+                    }
+                }, 3000);
+            }
+        }
+
+        function hideControls() {
+            const controls = document.getElementById("controls");
+            controls.classList.add("hidden");
+            if (controlsAutoHideTimeout) {
+                clearTimeout(controlsAutoHideTimeout);
+            }
+        }
+
+        function toggleControls() {
+            const controls = document.getElementById("controls");
+            if (controls.classList.contains("hidden")) {
+                showControls();
+            } else {
+                hideControls();
+            }
+        }
+
+        // Touch event handlers for mobile - Toggle controls with tap
+        if (isMobile) {
+            const viewerContainer = document.getElementById("viewerContainer");
+            let touchStartTime = 0;
+            let touchMoved = false;
+            let touchStartX = 0;
+            let touchStartY = 0;
+
+            // Separate touch handler for controls toggle (single finger only)
+            viewerContainer.addEventListener("touchstart", (e) => {
+                // Only handle single touch (not pinch zoom)
+                if (e.touches.length !== 1) {
+                    return;
+                }
+
+                // Don't interfere with drawing or other interactions
+                if (drawingMode !== 'none' || e.target.closest('.draw-canvas') || 
+                    e.target.closest('#controls') || e.target.closest('#optionsMenu') ||
+                    e.target.closest('#zoomControls') || e.target.closest('#thumbnailSidebar') ||
+                    e.target.closest('#searchPanel') || e.target.closest('.textLayer')) {
+                    return;
+                }
+
+                touchStartTime = Date.now();
+                touchMoved = false;
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }, { passive: true });
+
+            viewerContainer.addEventListener("touchmove", (e) => {
+                // Only handle single touch
+                if (e.touches.length !== 1) {
+                    touchMoved = true;
+                    return;
+                }
+
+                if (drawingMode !== 'none' || e.target.closest('.draw-canvas')) {
+                    return;
+                }
+
+                // Check if user is scrolling (moved more than threshold)
+                if (e.touches.length > 0) {
+                    const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+                    const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+                    if (deltaX > SWIPE_THRESHOLD || deltaY > SWIPE_THRESHOLD) {
+                        touchMoved = true;
+                    }
+                }
+            }, { passive: true });
+
+            viewerContainer.addEventListener("touchend", (e) => {
+                // Only handle single touch
+                if (e.changedTouches.length !== 1) {
+                    touchMoved = false;
+                    return;
+                }
+
+                // Don't interfere with drawing or other interactions
+                if (drawingMode !== 'none' || e.target.closest('.draw-canvas') || 
+                    e.target.closest('#controls') || e.target.closest('#optionsMenu') ||
+                    e.target.closest('#zoomControls') || e.target.closest('#thumbnailSidebar') ||
+                    e.target.closest('#searchPanel') || e.target.closest('.textLayer')) {
+                    touchMoved = false;
+                    return;
+                }
+
+                const touchDuration = Date.now() - touchStartTime;
+                
+                // Single tap (not a scroll or draw) - toggle controls
+                if (!touchMoved && touchDuration < TOUCH_DELAY && touchDuration > 50) {
+                    // Check if it's a single tap (not double tap)
+                    const timeSinceLastTouch = Date.now() - lastTouchTime;
+                    if (timeSinceLastTouch < 400) {
+                        // Double tap detected - don't toggle, let zoom handle it
+                        lastTouchTime = 0;
+                    } else {
+                        // Single tap - toggle controls
+                        lastTouchTime = Date.now();
+                        setTimeout(() => {
+                            if (Date.now() - lastTouchTime >= 400) {
+                                toggleControls();
+                            }
+                        }, 400);
+                    }
+                }
+                
+                touchMoved = false;
+            }, { passive: true });
+
+            // Show controls on scroll start, hide after scroll ends
+            let scrollTimeout;
+            viewerContainer.addEventListener("scroll", () => {
+                showControls();
+                
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                    if (!document.getElementById("controls").classList.contains("hidden")) {
+                        hideControls();
+                    }
+                }, 2000);
+            });
+
+            // Show controls initially on mobile
+            setTimeout(() => {
+                showControls();
+            }, 1000);
+        }
+
         document.getElementById("penTool").addEventListener("click", () => {
             drawingMode = drawingMode === 'pen' ? 'none' : 'pen';
             updateDrawingMode();
@@ -1679,13 +1835,6 @@
                     pageWrapper.classList.add("rotated-270");
                 }
             }
-        });
-
-        // ============================================
-        // DOWNLOAD & PRINT
-        // ============================================
-        document.getElementById("downloadPdf").addEventListener("click", () => {
-            window.open(url, '_blank');
         });
 
         // ============================================
