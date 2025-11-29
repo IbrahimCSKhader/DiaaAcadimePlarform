@@ -23,7 +23,6 @@
             user-select: none;
         }
 
-        /* Allow text selection in text layers */
         .textLayer, .textLayer * {
             -webkit-user-select: text !important;
             user-select: text !important;
@@ -33,8 +32,8 @@
         #viewerContainer {
             width: 100%;
             height: 100vh;
-            overflow-y: auto; /* Allow vertical scroll */
-            overflow-x: auto; /* Allow horizontal scroll when zoomed */
+            overflow-y: auto;
+            overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             display: flex;
             flex-direction: column;
@@ -43,64 +42,51 @@
             position: relative;
         }
 
-        /* Enable horizontal scroll when zoomed */
         #viewerContainer.zoomed {
             overflow-x: auto;
-            overflow-y: auto; /* Keep vertical scroll enabled */
-            align-items: flex-start; /* Align to left when zoomed for better scrolling */
-            /* Ensure smooth scrolling in both directions */
+            overflow-y: auto;
+            align-items: flex-start;
             scroll-behavior: auto;
-            /* Allow scrolling to negative values (left side) */
             padding-left: 0;
             padding-right: 0;
         }
 
         .page-wrapper {
             position: relative;
-            margin: 20px auto !important; /* Centered with nice margins */
+            margin: 20px auto !important;
             display: block;
-            width: auto !important; /* Auto width for proper centering */
-            max-width: 900px !important; /* Comfortable max width like Adobe Reader */
+            width: auto !important;
+            max-width: 900px !important;
             background: #2a2a2a;
             border-radius: 8px;
-            transform-origin: top left; /* Changed to top left for better scrolling */
-            /* Allow horizontal scroll when zoomed */
+            transform-origin: top left;
             overflow: visible;
             min-width: fit-content;
-            /* Ensure page stays visible */
             box-sizing: border-box;
-            /* Prevent pages from overlapping when zoomed */
             isolation: isolate;
-            /* Ensure minimum spacing between pages */
             min-height: fit-content;
-            /* Center content when not zoomed */
             text-align: center;
         }
         
         .page-wrapper > * {
-            margin: 0 auto; /* Center all children */
+            margin: 0 auto;
         }
         
-        /* When zoomed, align to left for proper scrolling */
         .page-wrapper.zoomed {
             text-align: left;
         }
         
         .page-wrapper.zoomed > * {
-            margin: 0; /* Remove auto margin when zoomed */
+            margin: 0;
         }
 
-        /* When zoomed, allow horizontal scrolling and increase spacing */
         .page-wrapper.zoomed {
             overflow-x: visible;
             overflow-y: visible;
             -webkit-overflow-scrolling: touch;
-            /* Ensure content is visible */
             display: block;
-            /* Margin will be set dynamically via JavaScript */
         }
 
-        /* Ensure text layer is selectable */
         .page-wrapper .textLayer {
             user-select: text;
             -webkit-user-select: text;
@@ -117,7 +103,6 @@
             image-rendering: -webkit-optimize-contrast;
         }
 
-        /* Text Layer Container */
         .textLayer {
             position: absolute;
             left: 0;
@@ -162,7 +147,7 @@
             transform: translateX(-50%);
             pointer-events: auto;
             border-radius: 8px;
-            z-index: 3; /* Above text layer */
+            z-index: 3;
         }
 
         .draw-canvas.no-drawing {
@@ -225,7 +210,6 @@
             transform: translateX(-50%) translateY(-10px);
         }
 
-        /* Auto-hide controls on mobile after inactivity */
         #controls.auto-hide {
             transition: opacity 0.5s ease, transform 0.5s ease;
         }
@@ -351,7 +335,6 @@
             text-align: center;
         }
 
-        /* Zoom Slider Styles */
         #zoomSlider {
             -webkit-appearance: none;
             appearance: none;
@@ -392,7 +375,6 @@
             background: #5a7ba8;
         }
 
-        /* Pan cursor when zoomed */
         body.pan-mode {
             cursor: grab;
         }
@@ -401,17 +383,10 @@
             cursor: grabbing;
         }
 
-        /* ============================================
-           ZOOM CONTROLS
-        ============================================ */
-        /* Zoom controls moved to menu - hide the separate zoom controls */
         #zoomControls {
             display: none;
         }
 
-        /* ============================================
-           THUMBNAIL SIDEBAR
-        ============================================ */
         #thumbnailSidebar {
             position: fixed;
             left: -300px;
@@ -478,9 +453,6 @@
             margin-top: 4px;
         }
 
-        /* ============================================
-           SEARCH PANEL
-        ============================================ */
         #searchPanel {
             position: fixed;
             top: 70px;
@@ -574,9 +546,6 @@
             opacity: 1;
         }
 
-        /* ============================================
-           NIGHT MODE
-        ============================================ */
         body.night-mode {
             background: #0a0a0a;
         }
@@ -589,9 +558,6 @@
             filter: invert(1) hue-rotate(180deg);
         }
 
-        /* ============================================
-           TEXT SELECTION
-        ============================================ */
         .text-selection-mode body {
             -webkit-user-select: text;
             user-select: text;
@@ -608,9 +574,6 @@
             pointer-events: none;
         }
 
-        /* ============================================
-           READING PROGRESS
-        ============================================ */
         #readingProgress {
             position: fixed;
             top: 0;
@@ -622,9 +585,6 @@
             transition: width 0.3s ease;
         }
 
-        /* ============================================
-           STATISTICS PANEL
-        ============================================ */
         #statsPanel {
             position: fixed;
             bottom: 100px;
@@ -756,23 +716,19 @@
         <button id="goBtn">Go</button>
     </div>
 
-    <!-- Reading Progress Bar -->
     <div id="readingProgress"></div>
 
-    <!-- Thumbnail Sidebar -->
     <div id="thumbnailSidebar">
         <h3>📑 الصفحات</h3>
         <div class="thumbnail-grid" id="thumbnailGrid"></div>
     </div>
 
-    <!-- Search Panel -->
     <div id="searchPanel">
         <h3 style="color: white; margin-bottom: 15px;">🔍 البحث</h3>
         <input type="text" id="searchInput" placeholder="ابحث في النص...">
         <div class="search-results" id="searchResults"></div>
     </div>
 
-    <!-- Statistics Panel -->
     <div id="statsPanel">
         <div class="stat-item">
             <span class="stat-label">الصفحات المقروءة:</span>
@@ -788,7 +744,6 @@
         </div>
     </div>
 
-    <!-- Zoom Controls - Moved to menu -->
     <div id="zoomControls" style="display: none;">
         <div id="zoomLevel">100%</div>
     </div>
@@ -869,7 +824,6 @@
     <div id="viewerContainer"></div>
 
     <script>
-        // Device detection
         const isIOSSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         const isAndroid = /Android/.test(navigator.userAgent);
         const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
@@ -912,7 +866,6 @@
             "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
         function calculateScale() {
-            // Desktop/Laptop: Set clean, readable baseScale (Adobe Reader-like)
             if (window.innerWidth > 1024) {
                 return 1.25; // Perfect readable size for desktop
             }
@@ -930,8 +883,6 @@
             
             let scale = availableWidth / standardPageWidth;
             
-            // Enhanced scale for high resolution rendering
-            // iOS: More conservative to maintain performance
             if (isIOSSafari) {
                 scale = Math.min(scale, 1.5); // Conservative: 1.5 for iOS (was 1.0, increased to 1.5)
             } else if (isAndroid) {
@@ -963,11 +914,9 @@
         let lastScrollPosition = 0;
         let visiblePages = new Set(); // Pages currently in viewport
         
-        // Performance caches (safe, no quality loss)
         let viewportCache = new Map(); // Cache viewport objects per page
         let textContentCache = new Map(); // Cache textContent per page
         
-        // Advanced features state
         let zoomLevel = 100;
         let isFullscreen = false;
         let isNightMode = false;
@@ -978,13 +927,11 @@
         let searchResults = [];
         let currentSearchIndex = -1;
         
-        // Smart rendering based on device - Adaptive for maximum stability and quality
         let maxConcurrentRenders = 1;
         let pixelRatio = window.devicePixelRatio || 1;
         let maxImageSize = 512 * 512;
         let renderTimeout = 2000; // Adaptive timeout based on device
         
-        // Adaptive pixelRatio: Balance quality vs performance based on device capabilities
         const deviceMemory = window.deviceMemory || 4; // Default to 4GB if unknown
         const hardwareConcurrency = navigator.hardwareConcurrency || 2;
         const screenWidth = window.screen.width || 1920;
@@ -992,11 +939,8 @@
         const screenPixels = screenWidth * screenHeight;
         const isHighDPI = window.devicePixelRatio >= 2;
         
-        // Calculate optimal settings based on device capabilities
         if (isIOSSafari) {
-            // iOS: Conservative for stability, but good quality
             maxConcurrentRenders = 1;
-            // Adaptive pixelRatio: Higher for newer devices, lower for older
             if (deviceMemory >= 4 && hardwareConcurrency >= 4) {
                 pixelRatio = Math.min(Math.max(pixelRatio, 2.0), 2.5); // 2.0-2.5 for newer iOS
             } else {
@@ -1005,7 +949,6 @@
             maxImageSize = 1024 * 1024;
             renderTimeout = 2500; // Longer timeout for iOS
         } else if (isAndroid || isLowEndDevice) {
-            // Android/Low-end: Safe defaults
             maxConcurrentRenders = deviceMemory >= 4 ? 2 : 1;
             if (deviceMemory >= 6 && hardwareConcurrency >= 4) {
                 pixelRatio = Math.min(Math.max(pixelRatio, 2.0), 2.5); // Better devices
@@ -1015,7 +958,6 @@
             maxImageSize = deviceMemory >= 4 ? 1536 * 1536 : 1024 * 1024;
             renderTimeout = 2000;
         } else if (isMobile) {
-            // Other mobile devices
             maxConcurrentRenders = deviceMemory >= 4 ? 2 : 1;
             pixelRatio = Math.min(Math.max(pixelRatio, 2.0), 2.5);
             maxImageSize = 1536 * 1536;
@@ -1028,12 +970,10 @@
                 pixelRatio = isHighDPI ? Math.min(Math.max(pixelRatio, 2.5), 3.0) : Math.min(Math.max(pixelRatio, 2.0), 2.5);
                 maxImageSize = 4096 * 4096;
             } else if (deviceMemory >= 4) {
-                // Mid-range desktop: Good quality
                 maxConcurrentRenders = 2;
                 pixelRatio = isHighDPI ? Math.min(Math.max(pixelRatio, 2.0), 2.5) : Math.min(Math.max(pixelRatio, 1.5), 2.0);
             maxImageSize = 2048 * 2048;
             } else {
-                // Low-end desktop: Safe quality
                 maxConcurrentRenders = 1;
                 pixelRatio = Math.min(Math.max(pixelRatio, 1.5), 2.0);
                 maxImageSize = 1536 * 1536;
@@ -1041,7 +981,6 @@
             renderTimeout = 1500; // Faster timeout for desktop
         }
         
-        // Ensure pixelRatio is never too high to prevent memory issues
         const maxSafePixelRatio = Math.min(pixelRatio, 3.0);
         pixelRatio = maxSafePixelRatio;
         
@@ -1071,7 +1010,6 @@
             updatePageInfo();
             updateReadingStats();
             
-            // Initialize base scale
             baseScale = calculateScale();
             applyZoom(100);
         }).catch(err => {
@@ -1089,7 +1027,6 @@
 
             scale = calculateScale();
 
-            // Create all page wrappers as placeholders
             for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
                 const pageWrapper = document.createElement("div");
                 pageWrapper.className = "page-wrapper";
@@ -1099,18 +1036,14 @@
                 pageWrappers.set(pageNum, pageWrapper);
             }
 
-            // Performance: Preload first 2-3 pages in parallel for faster initial load
             const initialPages = Math.min(3, pdfDoc.numPages);
             const preloadPromises = [];
             for (let i = 1; i <= initialPages; i++) {
                 preloadPromises.push(renderPage(i).catch(() => {})); // Ignore errors, continue loading
             }
-            // Wait for first page, let others load in background
             await preloadPromises[0];
-            // Continue with other pages in background
             Promise.all(preloadPromises.slice(1)).catch(() => {});
 
-            // Setup intersection observer for lazy loading
             setupIntersectionObserver();
         }
 
@@ -1131,39 +1064,31 @@
             return true;
         }
         
-        // Helper: Check if page has Hard Render Lock (target page protection)
         function hasHardRenderLock(pageNum) {
             return currentTargetPage === pageNum;
         }
         
-        // Helper: Process render queue with priorities
         async function processRenderQueue() {
             if (isProcessingQueue || renderQueue.length === 0) return;
             if (activeRendering >= maxConcurrentRenders) return;
             
             isProcessingQueue = true;
             
-            // Sort by priority (lower = higher priority)
             renderQueue.sort((a, b) => a.priority - b.priority);
             
-            // Process highest priority items first
             while (renderQueue.length > 0 && activeRendering < maxConcurrentRenders) {
                 const item = renderQueue.shift();
                 if (!item || renderedPages.has(item.pageNum) || pagePromises.has(item.pageNum)) {
                     continue;
                 }
                 
-                // HARD RENDER LOCK: Always process target page, skip others if needed
                 if (!hasHardRenderLock(item.pageNum) && !shouldRenderPage(item.pageNum)) {
                     continue;
                 }
                 
-                // Render with priority
                 renderPage(item.pageNum, item.priority).catch(() => {
-                    // Ignore errors
                 });
                 
-                // Small delay between renders to prevent overload
                 if (renderQueue.length > 0) {
                     await new Promise(r => setTimeout(r, 10));
                 }
@@ -1172,14 +1097,11 @@
             isProcessingQueue = false;
         }
         
-        // Helper: Queue page for rendering with priority
         function queuePageRender(pageNum, priority = 2) {
             if (renderedPages.has(pageNum) || pagePromises.has(pageNum)) return;
             
-            // Remove if already in queue
             const existingIndex = renderQueue.findIndex(item => item.pageNum === pageNum);
             if (existingIndex >= 0) {
-                // Update priority if new one is higher
                 if (priority < renderQueue[existingIndex].priority) {
                     renderQueue[existingIndex].priority = priority;
                 }
@@ -1187,7 +1109,6 @@
                 renderQueue.push({ pageNum, priority });
             }
             
-            // Process queue
             processRenderQueue();
         }
         
@@ -1212,12 +1133,10 @@
             // Keep visible pages
             visiblePages.forEach(p => pagesToKeep.add(p));
             
-            // Clean up pages that are far away
             renderedPages.forEach(pageNum => {
                 if (!pagesToKeep.has(pageNum) && Math.abs(pageNum - currentPage) > 5) {
                     const wrapper = pageWrappers.get(pageNum);
                     if (wrapper) {
-                        // Clear canvas data to free memory
                         const canvas = wrapper.querySelector('.pdf-canvas');
                         if (canvas) {
                             const ctx = canvas.getContext('2d');
@@ -1231,7 +1150,6 @@
                     }
                     renderedPages.delete(pageNum);
                     pagePromises.delete(pageNum);
-                    // Performance: Clear caches when page is removed
                     viewportCache.delete(pageNum);
                     textContentCache.delete(pageNum);
                 }
@@ -1241,7 +1159,6 @@
         async function renderPage(pageNum, priority = 0) {
             if (renderedPages.has(pageNum)) return;
             if (pagePromises.has(pageNum)) {
-                // If already queued, update priority if this is higher
                 const existing = renderQueue.find(item => item.pageNum === pageNum);
                 if (existing && priority < existing.priority) {
                     existing.priority = priority;
@@ -1250,27 +1167,22 @@
                 return pagePromises.get(pageNum);
             }
 
-            // Check if page should be rendered
             if (!shouldRenderPage(pageNum)) {
                 return;
             }
 
             const renderPromise = (async () => {
-                // Create AbortController for this render
                 const abortController = new AbortController();
                 renderAbortControllers.set(pageNum, abortController);
                 
-                // HARD RENDER LOCK: Disable timeout cancellation for target page
                 const isTargetPage = hasHardRenderLock(pageNum);
                 const timeoutId = isTargetPage ? null : setTimeout(() => {
-                    // Only cancel if not target page and not already rendered
                     if (!renderedPages.has(pageNum) && !hasHardRenderLock(pageNum)) {
                         abortController.abort();
                         renderAbortControllers.delete(pageNum);
                         pagePromises.delete(pageNum);
                         activeRendering = Math.max(0, activeRendering - 1);
                         
-                        // Clean up partial render
                         const wrapper = pageWrappers.get(pageNum);
                         if (wrapper && !wrapper.querySelector('.pdf-canvas')) {
                             wrapper.innerHTML = '';
@@ -1281,11 +1193,9 @@
                     renderTimeouts.set(pageNum, timeoutId);
                 }
 
-                // Wait if too many renders happening (with cancellation check)
                 let waitCount = 0;
-                const maxWait = 40; // Max 2 seconds wait (40 * 50ms)
+                const maxWait = 40;
                 while (activeRendering >= maxConcurrentRenders && waitCount < maxWait) {
-                    // HARD RENDER LOCK: Never cancel target page, ignore abort for target
                     if (!isTargetPage && (abortController.signal.aborted || !shouldRenderPage(pageNum))) {
                         if (timeoutId) clearTimeout(timeoutId);
                         renderTimeouts.delete(pageNum);
@@ -1296,7 +1206,6 @@
                     waitCount++;
                 }
                 
-                // HARD RENDER LOCK: Target page always gets priority, never skip
                 if (!isTargetPage && activeRendering >= maxConcurrentRenders * 2) {
                     if (timeoutId) clearTimeout(timeoutId);
                     renderTimeouts.delete(pageNum);
@@ -1304,7 +1213,6 @@
                     return;
                 }
 
-                // HARD RENDER LOCK: Final cancellation check - ignore for target page
                 if (!isTargetPage && (abortController.signal.aborted || !shouldRenderPage(pageNum))) {
                     if (timeoutId) clearTimeout(timeoutId);
                     renderTimeouts.delete(pageNum);
