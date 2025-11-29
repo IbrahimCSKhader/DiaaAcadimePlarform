@@ -928,6 +928,9 @@
         let renderedPages = new Set();
         let pagePromises = new Map();
         let activeRendering = 0;
+        let renderAbortControllers = new Map(); // AbortController for each render
+        let renderTimeouts = new Map(); // Timeout for each render
+        let currentTargetPage = null; // Current page user wants to see
         
         // Advanced features state
         let zoomLevel = 100;
@@ -1032,18 +1035,69 @@
             if (renderedPages.has(pageNum)) return;
             if (pagePromises.has(pageNum)) return pagePromises.get(pageNum);
 
+            // Cancel if user jumped to different page
+            if (currentTargetPage && Math.abs(pageNum - currentTargetPage) > 5) {
+                return;
+            }
+
             const renderPromise = (async () => {
-                // Wait if too many renders happening
+                // Create AbortController for this render
+                const abortController = new AbortController();
+                renderAbortControllers.set(pageNum, abortController);
+                
+                // Safety timeout: cancel if render takes too long
+                const timeoutId = setTimeout(() => {
+                    if (!renderedPages.has(pageNum)) {
+                        abortController.abort();
+                        renderAbortControllers.delete(pageNum);
+                        pagePromises.delete(pageNum);
+                        activeRendering--;
+                    }
+                }, 1500);
+                renderTimeouts.set(pageNum, timeoutId);
+
+                // Wait if too many renders happening (with cancellation check)
                 while (activeRendering >= maxConcurrentRenders) {
+                    // Check if cancelled
+                    if (abortController.signal.aborted || 
+                        (currentTargetPage && Math.abs(pageNum - currentTargetPage) > 5)) {
+                        clearTimeout(timeoutId);
+                        renderTimeouts.delete(pageNum);
+                        renderAbortControllers.delete(pageNum);
+                        return;
+                    }
                     await new Promise(r => setTimeout(r, 50));
+                }
+
+                // Final cancellation check before starting
+                if (abortController.signal.aborted || 
+                    (currentTargetPage && Math.abs(pageNum - currentTargetPage) > 5)) {
+                    clearTimeout(timeoutId);
+                    renderTimeouts.delete(pageNum);
+                    renderAbortControllers.delete(pageNum);
+                    return;
                 }
 
                 activeRendering++;
                 
                 try {
-                    if (renderedPages.has(pageNum)) return;
+                    if (renderedPages.has(pageNum)) {
+                        clearTimeout(timeoutId);
+                        renderTimeouts.delete(pageNum);
+                        renderAbortControllers.delete(pageNum);
+                        return;
+                    }
+
+                    // Check cancellation before expensive operations
+                    if (abortController.signal.aborted) return;
 
                     const page = await pdfDoc.getPage(pageNum);
+                    
+                    // Check cancellation after getting page
+                    if (abortController.signal.aborted || 
+                        (currentTargetPage && Math.abs(pageNum - currentTargetPage) > 5)) {
+                        return;
+                    }
                     // Always use baseScale for viewport - zoom is handled by CSS transform
                     const viewport = page.getViewport({ scale: baseScale });
 
@@ -1065,10 +1119,16 @@
                     const ctx = pdfCanvas.getContext("2d", { alpha: false });
                     ctx.scale(pixelRatio, pixelRatio);
                 
-                await page.render({
-                    canvasContext: ctx,
-                    viewport: viewport
-                }).promise;
+                    // Check cancellation before render
+                    if (abortController.signal.aborted) return;
+                    
+                    await page.render({
+                        canvasContext: ctx,
+                        viewport: viewport
+                    }).promise;
+                    
+                    // Check cancellation after render
+                    if (abortController.signal.aborted) return;
 
                 // Create text layer container
                 const textLayerDiv = document.createElement("div");
@@ -1080,8 +1140,14 @@
                 textLayerDiv.style.position = "absolute";
                 textLayerDiv.style.top = "0";
 
-                // Render text layer for selectable text
-                const textContent = await page.getTextContent();
+                    // Check cancellation before text layer
+                    if (abortController.signal.aborted) return;
+                    
+                    // Render text layer for selectable text
+                    const textContent = await page.getTextContent();
+                    
+                    // Check cancellation after getting text
+                    if (abortController.signal.aborted) return;
                 const textItems = textContent.items;
                 
                 // On iOS, limit text items to prevent performance issues
@@ -1196,22 +1262,33 @@
                 }
 
                     drawCanvases.set(pageNum, drawCanvas);
-                enableDrawing(drawCanvas);
+                    enableDrawing(drawCanvas);
                     renderedPages.add(pageNum);
+
+                    // Clean up cancellation resources
+                    clearTimeout(timeoutId);
+                    renderTimeouts.delete(pageNum);
+                    renderAbortControllers.delete(pageNum);
 
                     // Clean up memory on iOS periodically
                     if (isIOSSafari && pageNum % 5 === 0) {
                         await new Promise(r => setTimeout(r, 100));
                     }
                 } catch (err) {
-                    console.error(`Error rendering page ${pageNum}:`, err);
-                    const pageWrapper = pageWrappers.get(pageNum);
-                    if (pageWrapper) {
-                        pageWrapper.innerHTML = '<div style="text-align:center;padding:20px;color:#f00;">Error</div>';
+                    // Only log if not aborted
+                    if (!abortController.signal.aborted) {
+                        console.error(`Error rendering page ${pageNum}:`, err);
+                        const pageWrapper = pageWrappers.get(pageNum);
+                        if (pageWrapper) {
+                            pageWrapper.innerHTML = '<div style="text-align:center;padding:20px;color:#f00;">Error</div>';
+                        }
                     }
                 } finally {
                     activeRendering--;
                     pagePromises.delete(pageNum);
+                    clearTimeout(timeoutId);
+                    renderTimeouts.delete(pageNum);
+                    renderAbortControllers.delete(pageNum);
                 }
             })();
 
@@ -1226,15 +1303,23 @@
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
                         const pageNum = parseInt(entry.target.id.replace('page-', ''));
-                        renderPage(pageNum);
-                        // Pre-render next page
-                        if (pageNum < pdfDoc.numPages) {
-                            renderPage(pageNum + 1);
+                        
+                        // Only render if close to current target or current page
+                        const target = currentTargetPage || currentPage || 1;
+                        const distance = Math.abs(pageNum - target);
+                        
+                        // Limit rendering to nearby pages only
+                        if (distance <= 3) {
+                            renderPage(pageNum);
+                            // Pre-render next page only if very close
+                            if (pageNum < pdfDoc.numPages && distance <= 2) {
+                                renderPage(pageNum + 1);
+                            }
                         }
                     }
                 });
             }, {
-                rootMargin: '300px'
+                rootMargin: '200px' // Reduced to limit rendering
             });
 
             pageWrappers.forEach(wrapper => observer.observe(wrapper));
@@ -1328,7 +1413,35 @@
         async function scrollToPage(pageNum) {
             if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
             
+            // Set current target page for prioritization
+            currentTargetPage = pageNum;
+            
+            // Cancel renders that are far from target
+            renderAbortControllers.forEach((controller, pNum) => {
+                if (Math.abs(pNum - pageNum) > 5) {
+                    controller.abort();
+                    const timeoutId = renderTimeouts.get(pNum);
+                    if (timeoutId) clearTimeout(timeoutId);
+                    renderTimeouts.delete(pNum);
+                    renderAbortControllers.delete(pNum);
+                    if (pagePromises.has(pNum)) {
+                        pagePromises.delete(pNum);
+                    }
+                    activeRendering = Math.max(0, activeRendering - 1);
+                }
+            });
+            
+            // Prioritize target page render
             if (!renderedPages.has(pageNum)) {
+                // Cancel existing promise if any
+                if (pagePromises.has(pageNum)) {
+                    const controller = renderAbortControllers.get(pageNum);
+                    if (controller) {
+                        controller.abort();
+                        renderAbortControllers.delete(pageNum);
+                    }
+                    pagePromises.delete(pageNum);
+                }
                 await renderPage(pageNum);
             }
             
