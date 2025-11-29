@@ -57,10 +57,10 @@
 
         .page-wrapper {
             position: relative;
-            margin: 10px 0; /* Small margin when not zoomed */
+            margin: 20px auto !important; /* Centered with nice margins */
             display: block;
-            width: 100%;
-            max-width: 100%;
+            width: auto !important; /* Auto width for proper centering */
+            max-width: 900px !important; /* Comfortable max width like Adobe Reader */
             background: #2a2a2a;
             border-radius: 8px;
             transform-origin: top left; /* Changed to top left for better scrolling */
@@ -679,6 +679,28 @@
             transform: rotate(-90deg);
         }
 
+        /* ============================================
+            DESKTOP/LAPTOP LAYOUT OPTIMIZATION
+         ============================================ */
+        @media (min-width: 1025px) {
+            #viewerContainer {
+                align-items: center !important;
+                padding: 80px 40px 20px !important;
+            }
+            
+            .page-wrapper {
+                margin: 20px auto !important;
+                max-width: 900px !important;
+                width: auto !important;
+            }
+            
+            /* Ensure pages stay centered when not zoomed */
+            .page-wrapper:not(.zoomed) {
+                margin-left: auto !important;
+                margin-right: auto !important;
+            }
+        }
+
         @media (max-width: 768px) {
             #optionsMenu {
                 bottom: 20px;
@@ -815,7 +837,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <span style="font-size: 12px; color: #ccc;">Zoom Level</span>
                     <span id="zoomLevelDisplay" style="font-size: 14px; color: #3d5a80; font-weight: 600;">100%</span>
-                </div>
+            </div>
                 <input type="range" id="zoomSlider" min="50" max="200" value="100" step="5" 
                        style="width: 100%; height: 6px; background: #2a2a2a; border-radius: 3px; outline: none; cursor: pointer;">
                 <div style="display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-top: 4px;">
@@ -890,6 +912,11 @@
             "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
         function calculateScale() {
+            // Desktop/Laptop: Set clean, readable baseScale (Adobe Reader-like)
+            if (window.innerWidth > 1024) {
+                return 1.25; // Perfect readable size for desktop
+            }
+            
             const container = document.getElementById("viewerContainer");
             let containerWidth = window.innerWidth;
             
@@ -909,8 +936,6 @@
                 scale = Math.min(scale, 1.5); // Conservative: 1.5 for iOS (was 1.0, increased to 1.5)
             } else if (isAndroid) {
                 scale = Math.min(scale, 2.2); // Increased from 1.1 to 2.2
-            } else if (window.innerWidth > 1024) {
-                scale = Math.min(scale, 3.0); // Increased from 1.8 to 3.0
             } else if (window.innerWidth > 768) {
                 scale = Math.min(scale, 2.5); // Added for tablets
             }
@@ -995,14 +1020,14 @@
             // Desktop: High quality, but adaptive based on hardware
             if (deviceMemory >= 8 && hardwareConcurrency >= 4) {
                 // High-end desktop: Maximum quality
-                maxConcurrentRenders = 3;
+            maxConcurrentRenders = 3;
                 pixelRatio = isHighDPI ? Math.min(Math.max(pixelRatio, 2.5), 3.0) : Math.min(Math.max(pixelRatio, 2.0), 2.5);
                 maxImageSize = 4096 * 4096;
             } else if (deviceMemory >= 4) {
                 // Mid-range desktop: Good quality
                 maxConcurrentRenders = 2;
                 pixelRatio = isHighDPI ? Math.min(Math.max(pixelRatio, 2.0), 2.5) : Math.min(Math.max(pixelRatio, 1.5), 2.0);
-                maxImageSize = 2048 * 2048;
+            maxImageSize = 2048 * 2048;
             } else {
                 // Low-end desktop: Safe quality
                 maxConcurrentRenders = 1;
@@ -1315,11 +1340,11 @@
                 
                     // HARD RENDER LOCK: Ignore abort for target page
                     if (!isTargetPage && abortController.signal.aborted) return;
-                    
-                    await page.render({
-                        canvasContext: ctx,
-                        viewport: viewport
-                    }).promise;
+                
+                await page.render({
+                    canvasContext: ctx,
+                    viewport: viewport
+                }).promise;
                     
                     // HARD RENDER LOCK: Ignore abort for target page
                     if (!isTargetPage && abortController.signal.aborted) return;
@@ -1456,7 +1481,7 @@
                 }
 
                     drawCanvases.set(pageNum, drawCanvas);
-                    enableDrawing(drawCanvas);
+                enableDrawing(drawCanvas);
                     renderedPages.add(pageNum);
 
                     // Clean up cancellation resources
@@ -1474,16 +1499,16 @@
                         cleanupOffScreenPages();
                         // Small delay to prevent blocking
                         if (isIOSSafari || isLowEndDevice) {
-                            await new Promise(r => setTimeout(r, 100));
+                        await new Promise(r => setTimeout(r, 100));
                         }
                     }
                 } catch (err) {
                     // HARD RENDER LOCK: Always log errors for target page, ignore abort for target
                     if (isTargetPage || !abortController.signal.aborted) {
-                        console.error(`Error rendering page ${pageNum}:`, err);
-                        const pageWrapper = pageWrappers.get(pageNum);
-                        if (pageWrapper) {
-                            pageWrapper.innerHTML = '<div style="text-align:center;padding:20px;color:#f00;">Error</div>';
+                    console.error(`Error rendering page ${pageNum}:`, err);
+                    const pageWrapper = pageWrappers.get(pageNum);
+                    if (pageWrapper) {
+                        pageWrapper.innerHTML = '<div style="text-align:center;padding:20px;color:#f00;">Error</div>';
                         }
                     }
                 } finally {
@@ -1643,7 +1668,7 @@
                 }
             });
         }
-        
+
         async function scrollToPage(pageNum) {
             if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
             
@@ -2031,7 +2056,7 @@
                 // Enable/disable horizontal scroll based on zoom level
                 if (isZoomed) {
                     container.classList.add("zoomed");
-                } else {
+            } else {
                     container.classList.remove("zoomed");
                 }
                 
@@ -2086,9 +2111,13 @@
                             const containerWidth = container.clientWidth;
                             const scaledPageWidth = baseWidth * zoomFactor;
                             
-                            // If page is wider than container, allow left scrolling
+                            // When zoomed, center if page fits, otherwise allow scrolling
                             if (scaledPageWidth > containerWidth) {
                                 wrapper.style.marginLeft = "0";
+                                wrapper.style.marginRight = "auto";
+                            } else {
+                                // Center when zoomed but page still fits
+                                wrapper.style.marginLeft = "auto";
                                 wrapper.style.marginRight = "auto";
                             }
                             
@@ -2112,7 +2141,10 @@
                             wrapper.classList.remove("zoomed");
                             wrapper.style.width = "";
                             wrapper.style.minWidth = "";
-                            wrapper.style.maxWidth = "100%";
+                            wrapper.style.maxWidth = "900px"; // Keep max-width for desktop
+                            // Ensure pages are always centered when not zoomed
+                            wrapper.style.marginLeft = "auto";
+                            wrapper.style.marginRight = "auto";
                             wrapper.style.marginTop = "";
                             wrapper.style.marginBottom = "";
                             wrapper.style.paddingTop = "";
@@ -2589,7 +2621,7 @@
         function getNextZoomLevel(currentZoom, direction = 'in') {
             if (direction === 'in') {
                 return ZOOM_LEVELS.find(level => level > currentZoom) || ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
-            } else {
+                } else {
                 return [...ZOOM_LEVELS].reverse().find(level => level < currentZoom) || ZOOM_LEVELS[0];
             }
         }
@@ -2867,7 +2899,7 @@
                 applyZoom(newZoom, false, relativeX, relativeY);
                 
                 // Update last distance for next calculation
-                lastTouchDistance = currentDistance;
+                        lastTouchDistance = currentDistance;
                 initialZoomLevel = newZoom; // Update base for continuous zoom
             }
         }, { passive: true, capture: true });
