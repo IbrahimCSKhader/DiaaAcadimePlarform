@@ -931,6 +931,12 @@
         let renderAbortControllers = new Map(); // AbortController for each render
         let renderTimeouts = new Map(); // Timeout for each render
         let currentTargetPage = null; // Current page user wants to see
+        let renderQueue = []; // Priority queue for page rendering
+        let isProcessingQueue = false;
+        let lastScrollTime = 0;
+        let scrollVelocity = 0;
+        let lastScrollPosition = 0;
+        let visiblePages = new Set(); // Pages currently in viewport
         
         // Advanced features state
         let zoomLevel = 100;
@@ -943,31 +949,72 @@
         let searchResults = [];
         let currentSearchIndex = -1;
         
-        // Smart rendering based on device - Enhanced for high resolution
+        // Smart rendering based on device - Adaptive for maximum stability and quality
         let maxConcurrentRenders = 1;
         let pixelRatio = window.devicePixelRatio || 1;
         let maxImageSize = 512 * 512;
+        let renderTimeout = 2000; // Adaptive timeout based on device
         
-        // Increase pixel ratio for high resolution rendering
-        // iOS: More conservative to avoid memory issues
+        // Adaptive pixelRatio: Balance quality vs performance based on device capabilities
+        const deviceMemory = window.deviceMemory || 4; // Default to 4GB if unknown
+        const hardwareConcurrency = navigator.hardwareConcurrency || 2;
+        const screenWidth = window.screen.width || 1920;
+        const screenHeight = window.screen.height || 1080;
+        const screenPixels = screenWidth * screenHeight;
+        const isHighDPI = window.devicePixelRatio >= 2;
+        
+        // Calculate optimal settings based on device capabilities
         if (isIOSSafari) {
+            // iOS: Conservative for stability, but good quality
             maxConcurrentRenders = 1;
-            pixelRatio = Math.min(Math.max(pixelRatio, 1.5), 2.0); // Conservative: 1.5-2.0 for iOS
-            maxImageSize = 768 * 768; // Moderate increase for iOS
+            // Adaptive pixelRatio: Higher for newer devices, lower for older
+            if (deviceMemory >= 4 && hardwareConcurrency >= 4) {
+                pixelRatio = Math.min(Math.max(pixelRatio, 2.0), 2.5); // 2.0-2.5 for newer iOS
+            } else {
+                pixelRatio = Math.min(Math.max(pixelRatio, 1.5), 2.0); // 1.5-2.0 for older iOS
+            }
+            maxImageSize = 1024 * 1024;
+            renderTimeout = 2500; // Longer timeout for iOS
         } else if (isAndroid || isLowEndDevice) {
-            maxConcurrentRenders = 1;
-            pixelRatio = Math.max(pixelRatio, 2.0); // Increased from 1.5 to 2.0
-            maxImageSize = 1024 * 1024; // Increased from 768*768
+            // Android/Low-end: Safe defaults
+            maxConcurrentRenders = deviceMemory >= 4 ? 2 : 1;
+            if (deviceMemory >= 6 && hardwareConcurrency >= 4) {
+                pixelRatio = Math.min(Math.max(pixelRatio, 2.0), 2.5); // Better devices
+            } else {
+                pixelRatio = Math.min(Math.max(pixelRatio, 1.5), 2.0); // Lower-end devices
+            }
+            maxImageSize = deviceMemory >= 4 ? 1536 * 1536 : 1024 * 1024;
+            renderTimeout = 2000;
         } else if (isMobile) {
-            maxConcurrentRenders = 2;
-            pixelRatio = Math.max(pixelRatio, 2.5); // Increased from 1.5 to 2.5
-            maxImageSize = 1536 * 1536; // Increased from 1024*1024
+            // Other mobile devices
+            maxConcurrentRenders = deviceMemory >= 4 ? 2 : 1;
+            pixelRatio = Math.min(Math.max(pixelRatio, 2.0), 2.5);
+            maxImageSize = 1536 * 1536;
+            renderTimeout = 2000;
         } else {
-            // Desktop - High resolution
-            maxConcurrentRenders = 3;
-            pixelRatio = Math.max(pixelRatio, 3.0); // Increased from 2.0 to 3.0 for ultra high res
-            maxImageSize = 4096 * 4096; // Increased from 2048*2048
+            // Desktop: High quality, but adaptive based on hardware
+            if (deviceMemory >= 8 && hardwareConcurrency >= 4) {
+                // High-end desktop: Maximum quality
+                maxConcurrentRenders = 3;
+                pixelRatio = isHighDPI ? Math.min(Math.max(pixelRatio, 2.5), 3.0) : Math.min(Math.max(pixelRatio, 2.0), 2.5);
+                maxImageSize = 4096 * 4096;
+            } else if (deviceMemory >= 4) {
+                // Mid-range desktop: Good quality
+                maxConcurrentRenders = 2;
+                pixelRatio = isHighDPI ? Math.min(Math.max(pixelRatio, 2.0), 2.5) : Math.min(Math.max(pixelRatio, 1.5), 2.0);
+                maxImageSize = 2048 * 2048;
+            } else {
+                // Low-end desktop: Safe quality
+                maxConcurrentRenders = 1;
+                pixelRatio = Math.min(Math.max(pixelRatio, 1.5), 2.0);
+                maxImageSize = 1536 * 1536;
+            }
+            renderTimeout = 1500; // Faster timeout for desktop
         }
+        
+        // Ensure pixelRatio is never too high to prevent memory issues
+        const maxSafePixelRatio = Math.min(pixelRatio, 3.0);
+        pixelRatio = maxSafePixelRatio;
         
         const loadingTask = pdfjsLib.getDocument({
             url: url,
@@ -1031,12 +1078,141 @@
             setupIntersectionObserver();
         }
 
-        async function renderPage(pageNum) {
+        // Helper: Check if page should be rendered (priority check)
+        function shouldRenderPage(pageNum) {
+            // HARD RENDER LOCK: Always render if it's the target page - NEVER skip
+            if (currentTargetPage === pageNum) return true;
+            
+            // Always render if it's visible
+            if (visiblePages.has(pageNum)) return true;
+            
+            // Don't render if too far from target (but target page is already handled above)
+            if (currentTargetPage && Math.abs(pageNum - currentTargetPage) > 3) return false;
+            
+            // Don't render if too far from current page during fast scroll
+            if (scrollVelocity > 5 && Math.abs(pageNum - currentPage) > 2) return false;
+            
+            return true;
+        }
+        
+        // Helper: Check if page has Hard Render Lock (target page protection)
+        function hasHardRenderLock(pageNum) {
+            return currentTargetPage === pageNum;
+        }
+        
+        // Helper: Process render queue with priorities
+        async function processRenderQueue() {
+            if (isProcessingQueue || renderQueue.length === 0) return;
+            if (activeRendering >= maxConcurrentRenders) return;
+            
+            isProcessingQueue = true;
+            
+            // Sort by priority (lower = higher priority)
+            renderQueue.sort((a, b) => a.priority - b.priority);
+            
+            // Process highest priority items first
+            while (renderQueue.length > 0 && activeRendering < maxConcurrentRenders) {
+                const item = renderQueue.shift();
+                if (!item || renderedPages.has(item.pageNum) || pagePromises.has(item.pageNum)) {
+                    continue;
+                }
+                
+                // HARD RENDER LOCK: Always process target page, skip others if needed
+                if (!hasHardRenderLock(item.pageNum) && !shouldRenderPage(item.pageNum)) {
+                    continue;
+                }
+                
+                // Render with priority
+                renderPage(item.pageNum, item.priority).catch(() => {
+                    // Ignore errors
+                });
+                
+                // Small delay between renders to prevent overload
+                if (renderQueue.length > 0) {
+                    await new Promise(r => setTimeout(r, 10));
+                }
+            }
+            
+            isProcessingQueue = false;
+        }
+        
+        // Helper: Queue page for rendering with priority
+        function queuePageRender(pageNum, priority = 2) {
+            if (renderedPages.has(pageNum) || pagePromises.has(pageNum)) return;
+            
+            // Remove if already in queue
+            const existingIndex = renderQueue.findIndex(item => item.pageNum === pageNum);
+            if (existingIndex >= 0) {
+                // Update priority if new one is higher
+                if (priority < renderQueue[existingIndex].priority) {
+                    renderQueue[existingIndex].priority = priority;
+                }
+            } else {
+                renderQueue.push({ pageNum, priority });
+            }
+            
+            // Process queue
+            processRenderQueue();
+        }
+        
+        // Helper: Clean up memory for off-screen pages
+        function cleanupOffScreenPages() {
+            if (renderedPages.size <= 10) return; // Keep at least 10 pages
+            
+            const pagesToKeep = new Set();
+            
+            // Keep current page and nearby pages
+            for (let i = Math.max(1, currentPage - 2); i <= Math.min(pdfDoc.numPages, currentPage + 2); i++) {
+                pagesToKeep.add(i);
+            }
+            
+            // Keep target page and nearby pages
+            if (currentTargetPage) {
+                for (let i = Math.max(1, currentTargetPage - 2); i <= Math.min(pdfDoc.numPages, currentTargetPage + 2); i++) {
+                    pagesToKeep.add(i);
+                }
+            }
+            
+            // Keep visible pages
+            visiblePages.forEach(p => pagesToKeep.add(p));
+            
+            // Clean up pages that are far away
+            renderedPages.forEach(pageNum => {
+                if (!pagesToKeep.has(pageNum) && Math.abs(pageNum - currentPage) > 5) {
+                    const wrapper = pageWrappers.get(pageNum);
+                    if (wrapper) {
+                        // Clear canvas data to free memory
+                        const canvas = wrapper.querySelector('.pdf-canvas');
+                        if (canvas) {
+                            const ctx = canvas.getContext('2d');
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        }
+                        const drawCanvas = drawCanvases.get(pageNum);
+                        if (drawCanvas) {
+                            const drawCtx = drawCanvas.getContext('2d');
+                            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                        }
+                    }
+                    renderedPages.delete(pageNum);
+                    pagePromises.delete(pageNum);
+                }
+            });
+        }
+        
+        async function renderPage(pageNum, priority = 0) {
             if (renderedPages.has(pageNum)) return;
-            if (pagePromises.has(pageNum)) return pagePromises.get(pageNum);
+            if (pagePromises.has(pageNum)) {
+                // If already queued, update priority if this is higher
+                const existing = renderQueue.find(item => item.pageNum === pageNum);
+                if (existing && priority < existing.priority) {
+                    existing.priority = priority;
+                    renderQueue.sort((a, b) => a.priority - b.priority);
+                }
+                return pagePromises.get(pageNum);
+            }
 
-            // Cancel if user jumped to different page
-            if (currentTargetPage && Math.abs(pageNum - currentTargetPage) > 5) {
+            // Check if page should be rendered
+            if (!shouldRenderPage(pageNum)) {
                 return;
             }
 
@@ -1045,34 +1221,53 @@
                 const abortController = new AbortController();
                 renderAbortControllers.set(pageNum, abortController);
                 
-                // Safety timeout: cancel if render takes too long
-                const timeoutId = setTimeout(() => {
-                    if (!renderedPages.has(pageNum)) {
+                // HARD RENDER LOCK: Disable timeout cancellation for target page
+                const isTargetPage = hasHardRenderLock(pageNum);
+                const timeoutId = isTargetPage ? null : setTimeout(() => {
+                    // Only cancel if not target page and not already rendered
+                    if (!renderedPages.has(pageNum) && !hasHardRenderLock(pageNum)) {
                         abortController.abort();
                         renderAbortControllers.delete(pageNum);
                         pagePromises.delete(pageNum);
-                        activeRendering--;
+                        activeRendering = Math.max(0, activeRendering - 1);
+                        
+                        // Clean up partial render
+                        const wrapper = pageWrappers.get(pageNum);
+                        if (wrapper && !wrapper.querySelector('.pdf-canvas')) {
+                            wrapper.innerHTML = '';
+                        }
                     }
-                }, 1500);
-                renderTimeouts.set(pageNum, timeoutId);
+                }, renderTimeout);
+                if (timeoutId) {
+                    renderTimeouts.set(pageNum, timeoutId);
+                }
 
                 // Wait if too many renders happening (with cancellation check)
-                while (activeRendering >= maxConcurrentRenders) {
-                    // Check if cancelled
-                    if (abortController.signal.aborted || 
-                        (currentTargetPage && Math.abs(pageNum - currentTargetPage) > 5)) {
-                        clearTimeout(timeoutId);
+                let waitCount = 0;
+                const maxWait = 40; // Max 2 seconds wait (40 * 50ms)
+                while (activeRendering >= maxConcurrentRenders && waitCount < maxWait) {
+                    // HARD RENDER LOCK: Never cancel target page, ignore abort for target
+                    if (!isTargetPage && (abortController.signal.aborted || !shouldRenderPage(pageNum))) {
+                        if (timeoutId) clearTimeout(timeoutId);
                         renderTimeouts.delete(pageNum);
                         renderAbortControllers.delete(pageNum);
                         return;
                     }
                     await new Promise(r => setTimeout(r, 50));
+                    waitCount++;
+                }
+                
+                // HARD RENDER LOCK: Target page always gets priority, never skip
+                if (!isTargetPage && activeRendering >= maxConcurrentRenders * 2) {
+                    if (timeoutId) clearTimeout(timeoutId);
+                    renderTimeouts.delete(pageNum);
+                    renderAbortControllers.delete(pageNum);
+                    return;
                 }
 
-                // Final cancellation check before starting
-                if (abortController.signal.aborted || 
-                    (currentTargetPage && Math.abs(pageNum - currentTargetPage) > 5)) {
-                    clearTimeout(timeoutId);
+                // HARD RENDER LOCK: Final cancellation check - ignore for target page
+                if (!isTargetPage && (abortController.signal.aborted || !shouldRenderPage(pageNum))) {
+                    if (timeoutId) clearTimeout(timeoutId);
                     renderTimeouts.delete(pageNum);
                     renderAbortControllers.delete(pageNum);
                     return;
@@ -1082,20 +1277,19 @@
                 
                 try {
                     if (renderedPages.has(pageNum)) {
-                        clearTimeout(timeoutId);
+                        if (timeoutId) clearTimeout(timeoutId);
                         renderTimeouts.delete(pageNum);
                         renderAbortControllers.delete(pageNum);
                         return;
                     }
 
-                    // Check cancellation before expensive operations
-                    if (abortController.signal.aborted) return;
+                    // HARD RENDER LOCK: Ignore abort for target page
+                    if (!isTargetPage && abortController.signal.aborted) return;
 
                     const page = await pdfDoc.getPage(pageNum);
                     
-                    // Check cancellation after getting page
-                    if (abortController.signal.aborted || 
-                        (currentTargetPage && Math.abs(pageNum - currentTargetPage) > 5)) {
+                    // HARD RENDER LOCK: Ignore cancellation checks for target page
+                    if (!isTargetPage && (abortController.signal.aborted || !shouldRenderPage(pageNum))) {
                         return;
                     }
                     // Always use baseScale for viewport - zoom is handled by CSS transform
@@ -1119,16 +1313,16 @@
                     const ctx = pdfCanvas.getContext("2d", { alpha: false });
                     ctx.scale(pixelRatio, pixelRatio);
                 
-                    // Check cancellation before render
-                    if (abortController.signal.aborted) return;
+                    // HARD RENDER LOCK: Ignore abort for target page
+                    if (!isTargetPage && abortController.signal.aborted) return;
                     
                     await page.render({
                         canvasContext: ctx,
                         viewport: viewport
                     }).promise;
                     
-                    // Check cancellation after render
-                    if (abortController.signal.aborted) return;
+                    // HARD RENDER LOCK: Ignore abort for target page
+                    if (!isTargetPage && abortController.signal.aborted) return;
 
                 // Create text layer container
                 const textLayerDiv = document.createElement("div");
@@ -1140,14 +1334,14 @@
                 textLayerDiv.style.position = "absolute";
                 textLayerDiv.style.top = "0";
 
-                    // Check cancellation before text layer
-                    if (abortController.signal.aborted) return;
+                    // HARD RENDER LOCK: Ignore abort for target page
+                    if (!isTargetPage && abortController.signal.aborted) return;
                     
                     // Render text layer for selectable text
                     const textContent = await page.getTextContent();
                     
-                    // Check cancellation after getting text
-                    if (abortController.signal.aborted) return;
+                    // HARD RENDER LOCK: Ignore abort for target page
+                    if (!isTargetPage && abortController.signal.aborted) return;
                 const textItems = textContent.items;
                 
                 // On iOS, limit text items to prevent performance issues
@@ -1266,17 +1460,26 @@
                     renderedPages.add(pageNum);
 
                     // Clean up cancellation resources
-                    clearTimeout(timeoutId);
+                    if (timeoutId) clearTimeout(timeoutId);
                     renderTimeouts.delete(pageNum);
                     renderAbortControllers.delete(pageNum);
-
-                    // Clean up memory on iOS periodically
-                    if (isIOSSafari && pageNum % 5 === 0) {
-                        await new Promise(r => setTimeout(r, 100));
+                    
+                    // HARD RENDER LOCK: Clear target page flag after successful render
+                    if (isTargetPage && currentTargetPage === pageNum) {
+                        // Keep target page flag until scroll completes, but mark as rendered
+                    }
+                    
+                    // Periodic memory cleanup
+                    if (pageNum % 5 === 0) {
+                        cleanupOffScreenPages();
+                        // Small delay to prevent blocking
+                        if (isIOSSafari || isLowEndDevice) {
+                            await new Promise(r => setTimeout(r, 100));
+                        }
                     }
                 } catch (err) {
-                    // Only log if not aborted
-                    if (!abortController.signal.aborted) {
+                    // HARD RENDER LOCK: Always log errors for target page, ignore abort for target
+                    if (isTargetPage || !abortController.signal.aborted) {
                         console.error(`Error rendering page ${pageNum}:`, err);
                         const pageWrapper = pageWrappers.get(pageNum);
                         if (pageWrapper) {
@@ -1286,7 +1489,7 @@
                 } finally {
                     activeRendering--;
                     pagePromises.delete(pageNum);
-                    clearTimeout(timeoutId);
+                    if (timeoutId) clearTimeout(timeoutId);
                     renderTimeouts.delete(pageNum);
                     renderAbortControllers.delete(pageNum);
                 }
@@ -1304,22 +1507,32 @@
                     if (entry.isIntersecting) {
                         const pageNum = parseInt(entry.target.id.replace('page-', ''));
                         
+                        // Mark as visible
+                        visiblePages.add(pageNum);
+                        
                         // Only render if close to current target or current page
                         const target = currentTargetPage || currentPage || 1;
                         const distance = Math.abs(pageNum - target);
                         
-                        // Limit rendering to nearby pages only
-                        if (distance <= 3) {
-                            renderPage(pageNum);
-                            // Pre-render next page only if very close
-                            if (pageNum < pdfDoc.numPages && distance <= 2) {
-                                renderPage(pageNum + 1);
+                        // Limit rendering to nearby pages only, and respect scroll velocity
+                        if (distance <= 3 && (scrollVelocity < 10 || distance <= 1)) {
+                            // Priority: 0 = target page, 1 = visible, 2 = nearby
+                            const priority = pageNum === target ? 0 : (visiblePages.has(pageNum) ? 1 : 2);
+                            queuePageRender(pageNum, priority);
+                            
+                            // Pre-render next page only if very close and not scrolling fast
+                            if (pageNum < pdfDoc.numPages && distance <= 2 && scrollVelocity < 5) {
+                                queuePageRender(pageNum + 1, 2);
                             }
                         }
+                    } else {
+                        // Remove from visible set when out of view
+                        const pageNum = parseInt(entry.target.id.replace('page-', ''));
+                        visiblePages.delete(pageNum);
                     }
                 });
             }, {
-                rootMargin: '200px' // Reduced to limit rendering
+                rootMargin: isMobile ? '150px' : '200px' // Adaptive based on device
             });
 
             pageWrappers.forEach(wrapper => observer.observe(wrapper));
@@ -1410,15 +1623,14 @@
             });
         }
 
-        async function scrollToPage(pageNum) {
-            if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
-            
-            // Set current target page for prioritization
-            currentTargetPage = pageNum;
-            
-            // Cancel renders that are far from target
+        // Helper: Cancel renders far from target
+        function cancelDistantRenders(targetPage) {
             renderAbortControllers.forEach((controller, pNum) => {
-                if (Math.abs(pNum - pageNum) > 5) {
+                // HARD RENDER LOCK: NEVER cancel the target page
+                if (pNum === targetPage) return;
+                
+                const distance = Math.abs(pNum - targetPage);
+                if (distance > 3 || (distance > 1 && !visiblePages.has(pNum))) {
                     controller.abort();
                     const timeoutId = renderTimeouts.get(pNum);
                     if (timeoutId) clearTimeout(timeoutId);
@@ -1430,19 +1642,43 @@
                     activeRendering = Math.max(0, activeRendering - 1);
                 }
             });
+        }
+        
+        async function scrollToPage(pageNum) {
+            if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
             
-            // Prioritize target page render
+            // Set current target page for prioritization
+            currentTargetPage = pageNum;
+            
+            // Cancel renders that are far from target
+            cancelDistantRenders(pageNum);
+            
+            // Clean up memory before rendering new page
+            cleanupOffScreenPages();
+            
+            // Prioritize target page render (highest priority = 0)
             if (!renderedPages.has(pageNum)) {
-                // Cancel existing promise if any
-                if (pagePromises.has(pageNum)) {
+                // HARD RENDER LOCK: Only cancel existing promise if it's NOT already the target page
+                // If it's already the target, let it continue rendering
+                if (pagePromises.has(pageNum) && currentTargetPage !== pageNum) {
                     const controller = renderAbortControllers.get(pageNum);
                     if (controller) {
                         controller.abort();
                         renderAbortControllers.delete(pageNum);
                     }
+                    const timeoutId = renderTimeouts.get(pageNum);
+                    if (timeoutId) clearTimeout(timeoutId);
+                    renderTimeouts.delete(pageNum);
                     pagePromises.delete(pageNum);
                 }
-                await renderPage(pageNum);
+                
+                // Render with highest priority (or wait for existing render if already target)
+                if (!pagePromises.has(pageNum)) {
+                    await renderPage(pageNum, 0);
+                } else {
+                    // Wait for existing render to complete (it's already the target)
+                    await pagePromises.get(pageNum);
+                }
             }
             
             const pageElement = pageWrappers.get(pageNum);
@@ -1472,10 +1708,49 @@
         }
 
         let scrollTimeout;
+        let scrollThrottleTimeout;
         document.getElementById("viewerContainer").addEventListener("scroll", () => {
+            const now = Date.now();
+            const container = document.getElementById("viewerContainer");
+            const currentScroll = container.scrollTop;
+            
+            // Calculate scroll velocity
+            if (lastScrollTime > 0) {
+                const timeDelta = now - lastScrollTime;
+                const scrollDelta = Math.abs(currentScroll - lastScrollPosition);
+                scrollVelocity = timeDelta > 0 ? scrollDelta / timeDelta * 1000 : 0; // pixels per second
+            }
+            lastScrollTime = now;
+            lastScrollPosition = currentScroll;
+            
+            // Update visible pages immediately (throttled)
+            clearTimeout(scrollThrottleTimeout);
+            scrollThrottleTimeout = setTimeout(() => {
+                visiblePages.clear();
+                const viewportTop = container.scrollTop;
+                const viewportBottom = viewportTop + container.clientHeight;
+                
+                pageWrappers.forEach((wrapper, pageNum) => {
+                    const rect = wrapper.getBoundingClientRect();
+                    const wrapperTop = rect.top + container.scrollTop;
+                    const wrapperBottom = wrapperTop + rect.height;
+                    
+                    // Page is visible if it overlaps with viewport
+                    if (wrapperBottom >= viewportTop && wrapperTop <= viewportBottom) {
+                        visiblePages.add(pageNum);
+                    }
+                });
+                
+                // Queue visible pages for rendering with priority
+                visiblePages.forEach(pageNum => {
+                    if (!renderedPages.has(pageNum) && !pagePromises.has(pageNum)) {
+                        queuePageRender(pageNum, 1); // Priority 1 for visible pages
+                    }
+                });
+            }, 100);
+            
             clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(() => {
-                const container = document.getElementById("viewerContainer");
                 const centerY = container.clientHeight / 2;
 
                 pageWrappers.forEach((wrapper, pageNum) => {
@@ -1491,6 +1766,12 @@
                 updatePageInfo();
                 updateActiveThumbnail();
                 updateReadingStats();
+                
+                // Clean up memory after scroll settles
+                cleanupOffScreenPages();
+                
+                // Reset scroll velocity
+                scrollVelocity = 0;
             }, 150);
         });
 
