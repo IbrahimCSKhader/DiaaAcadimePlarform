@@ -1,5 +1,5 @@
 const container = document.getElementById("visited-container");
-const apiUrl = "https://diaaapi.premiumasp.net/api/Summary/recent?limit=6";
+const apiUrl = "https://diaaapi.premiumasp.net/api/Summary/most-visited-new";
 
 fetch(apiUrl)
   .then((response) => response.json())

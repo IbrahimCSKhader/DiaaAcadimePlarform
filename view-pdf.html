@@ -150,6 +150,109 @@
             z-index: 3;
         }
 
+        /* Notes system styles (scoped) */
+        .notes-layer {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            height: 100%;
+            pointer-events: auto;
+            z-index: 5; /* Above draw-canvas */
+        }
+
+        .notes-canvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            border-radius: 8px;
+            z-index: 6;
+            pointer-events: auto;
+        }
+
+        .notes-text-layer {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 7;
+            pointer-events: none; /* text notes only accept pointer when active */
+        }
+
+        .note-text {
+            position: absolute;
+            min-width: 120px;
+            max-width: 60%;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.95);
+            color: #111;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-size: 16px;
+            line-height: 1.3;
+            outline: none;
+            resize: none;
+            pointer-events: auto;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        .note-handle {
+            position: absolute;
+            right: 8px;
+            top: 8px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.2);
+            cursor: grab;
+            z-index: 10;
+        }
+
+        /* Floating notes toolbar (minimal, premium look) */
+        #notesToolbar {
+            position: fixed;
+            right: 30px;
+            top: 140px;
+            z-index: 10020;
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+            background: rgba(18, 23, 28, 0.8);
+            border-radius: 12px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 6px 30px rgba(0,0,0,0.4);
+            transition: opacity 0.3s ease, transform 0.25s ease;
+        }
+
+        #notesToolbar.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-8px);
+        }
+
+        #notesToolbar button,
+        #notesToolbar input[type="color"] {
+            height: 40px;
+            width: 40px;
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(135deg,#3d5a80,#2c4458);
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+        }
+
+        #notesToolbar .active {
+            outline: 2px solid rgba(61,90,128,0.4);
+        }
+
         .draw-canvas.no-drawing {
             pointer-events: none;
         }
@@ -716,6 +819,26 @@
         <button id="goBtn">Go</button>
     </div>
 
+    <!-- Notes Toolbar (additive, minimal, iPad-style) -->
+    <div id="notesToolbar" class="hidden" aria-hidden="true">
+        <button id="notesToggle" title="Notes">🗒️</button>
+        <button id="notesPen" title="Pen">✏️</button>
+        <button id="notesPencil" title="Pencil">✍️</button>
+        <button id="notesMarker" title="Marker">🖍️</button>
+        <button id="notesHighlighter" title="Highlighter">🟨</button>
+        <button id="notesEraser" title="Eraser">🧽</button>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:center">
+            <div style="display:flex;gap:6px">
+                <button id="eraserSmall" title="Eraser Small" style="width:30px;height:30px;padding:0">S</button>
+                <button id="eraserMedium" title="Eraser Medium" style="width:30px;height:30px;padding:0">M</button>
+                <button id="eraserLarge" title="Eraser Large" style="width:30px;height:30px;padding:0">L</button>
+            </div>
+        </div>
+        <input id="notesColor" type="color" value="#ffeb3b" title="Color" style="width:40px;height:40px;padding:6px;">
+        <input id="notesThickness" type="range" min="1" max="40" value="3" title="Thickness" style="width:80px;align-self:center">
+        <button id="notesText" title="Text">📝</button>
+    </div>
+
     <div id="readingProgress"></div>
 
     <div id="thumbnailSidebar">
@@ -1147,6 +1270,13 @@
                             const drawCtx = drawCanvas.getContext('2d');
                             drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
                         }
+
+                        // Release notes overlay for memory safety (non-destructive; notes persisted)
+                        try {
+                            if (window.NotesManager && typeof window.NotesManager.releasePage === 'function') {
+                                window.NotesManager.releasePage(pageNum);
+                            }
+                        } catch (e) {}
                     }
                     renderedPages.delete(pageNum);
                     pagePromises.delete(pageNum);
@@ -1422,7 +1552,16 @@
                 }
 
                     drawCanvases.set(pageNum, drawCanvas);
-                enableDrawing(drawCanvas);
+                    enableDrawing(drawCanvas);
+
+                    // Notes: attach per-page notes overlay (additive and non-intrusive)
+                    try {
+                        if (window.NotesManager && typeof window.NotesManager.attachToPage === 'function') {
+                            window.NotesManager.attachToPage(pageWrapper, pageNum, viewport.width, viewport.height);
+                        }
+                    } catch (e) {
+                        console.error('NotesManager attach error:', e);
+                    }
                     renderedPages.add(pageNum);
 
                     // Clean up cancellation resources
@@ -2116,6 +2255,15 @@
                 } else {
                     zoomLevel = targetZoomLevel; // Ensure final value
                     zoomAnimationFrame = null;
+
+                    // Redraw notes for current pages to respect pixelRatio/resolution
+                    try {
+                        if (window.NotesManager && typeof window.NotesManager.redrawPage === 'function') {
+                            renderedPages.forEach(p => {
+                                try { window.NotesManager.redrawPage(p); } catch (e) {}
+                            });
+                        }
+                    } catch (e) {}
                 }
             }
             
@@ -2942,6 +3090,518 @@
                 }
             }, 30000); // Every 30 seconds
         }
+
+        /* ============================================
+           STUDENT NOTES SYSTEM (Additive module)
+           - Per-page overlay with pen/pencil/marker/highlighter
+           - Text notes (contenteditable) with auto-resize
+           - Eraser implemented as an action (destination-out)
+           - Persists to localStorage per file id
+           - Restores on page render and zoom changes
+           - Non-intrusive: separate layer, does not alter PDF rendering
+        ============================================ */
+        (function () {
+            const Notes = {
+                initialized: false,
+                fileId: null,
+                storageKey: null,
+                data: { pages: {} }, // { pages: { [pageNum]: { actions: [], texts: [] } } }
+                pageLayers: new Map(), // pageNum -> {layer, canvas, textLayer}
+                notesTool: 'none', // none|pen|pencil|marker|highlighter|eraser|text
+                color: '#ffeb3b',
+                thickness: 3,
+                eraserSize: 20,
+                debounceSaveTimer: null,
+                saveDebounceMs: 300,
+
+                init(fileId) {
+                    if (this.initialized) return;
+                    this.initialized = true;
+                    this.fileId = fileId || 'default';
+                    this.storageKey = `pdf-notes:${this.fileId}`;
+                    this.loadFromStorage();
+                    this.setupToolbar();
+                    // Show toolbar briefly on load then auto-hide
+                    const tb = document.getElementById('notesToolbar');
+                    if (tb) {
+                        tb.classList.remove('hidden');
+                        setTimeout(() => tb.classList.add('hidden'), 2000);
+                    }
+                    window.addEventListener('beforeunload', () => this.saveToStorage());
+                },
+
+                setupToolbar() {
+                    const toolbar = document.getElementById('notesToolbar');
+                    if (!toolbar) return;
+
+                    const toggle = document.getElementById('notesToggle');
+                    const pen = document.getElementById('notesPen');
+                    const pencil = document.getElementById('notesPencil');
+                    const marker = document.getElementById('notesMarker');
+                    const highlighter = document.getElementById('notesHighlighter');
+                    const eraser = document.getElementById('notesEraser');
+                    const color = document.getElementById('notesColor');
+                    const thickness = document.getElementById('notesThickness');
+                    const textBtn = document.getElementById('notesText');
+
+                    // Toggle toolbar visibility
+                    toggle.addEventListener('click', () => {
+                        toolbar.classList.toggle('hidden');
+                        toolbar.setAttribute('aria-hidden', toolbar.classList.contains('hidden'));
+                    });
+
+                    function clearActive() {
+                        [pen, pencil, marker, highlighter, eraser, textBtn].forEach(b => b.classList.remove('active'));
+                    }
+
+                    pen.addEventListener('click', () => { clearActive(); pen.classList.add('active'); Notes.setTool('pen'); });
+                    pencil.addEventListener('click', () => { clearActive(); pencil.classList.add('active'); Notes.setTool('pencil'); });
+                    marker.addEventListener('click', () => { clearActive(); marker.classList.add('active'); Notes.setTool('marker'); });
+                    highlighter.addEventListener('click', () => { clearActive(); highlighter.classList.add('active'); Notes.setTool('highlighter'); });
+                    eraser.addEventListener('click', () => { clearActive(); eraser.classList.add('active'); Notes.setTool('eraser'); });
+                    textBtn.addEventListener('click', () => { clearActive(); textBtn.classList.add('active'); Notes.setTool('text'); });
+
+                    color.addEventListener('change', (e) => { Notes.color = e.target.value; });
+                    thickness.addEventListener('input', (e) => { Notes.thickness = parseInt(e.target.value, 10) || 1; });
+
+                    // Eraser size controls
+                    const s = document.getElementById('eraserSmall');
+                    const m = document.getElementById('eraserMedium');
+                    const l = document.getElementById('eraserLarge');
+                    function clearEraserActive(){ [s,m,l].forEach(b=>b.classList.remove('active')); }
+                    s.addEventListener('click', ()=>{ clearEraserActive(); s.classList.add('active'); Notes.eraserSize = 8; });
+                    m.addEventListener('click', ()=>{ clearEraserActive(); m.classList.add('active'); Notes.eraserSize = 20; });
+                    l.addEventListener('click', ()=>{ clearEraserActive(); l.classList.add('active'); Notes.eraserSize = 40; });
+                    // default medium active
+                    m.classList.add('active');
+                },
+
+                setTool(tool) {
+                    this.notesTool = tool || 'none';
+                    // Visual cursor feedback
+                    if (this.notesTool === 'text') {
+                        document.body.style.cursor = 'text';
+                    } else if (['pen','pencil','marker','highlighter'].includes(this.notesTool)) {
+                        document.body.style.cursor = 'crosshair';
+                    } else if (this.notesTool === 'eraser') {
+                        document.body.style.cursor = 'cell';
+                    } else {
+                        document.body.style.cursor = '';
+                    }
+                },
+
+                loadFromStorage() {
+                    try {
+                        const raw = localStorage.getItem(this.storageKey);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            if (parsed && parsed.pages) this.data = parsed;
+                        }
+                    } catch (e) {
+                        console.warn('Failed to load notes from storage', e);
+                    }
+                },
+
+                saveToStorage() {
+                    try {
+                        localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+                    } catch (e) {
+                        console.warn('Failed to save notes to storage', e);
+                    }
+                },
+
+                scheduleSave() {
+                    if (this.debounceSaveTimer) clearTimeout(this.debounceSaveTimer);
+                    this.debounceSaveTimer = setTimeout(() => this.saveToStorage(), this.saveDebounceMs);
+                },
+
+                ensurePageData(pageNum) {
+                    if (!this.data.pages[pageNum]) this.data.pages[pageNum] = { actions: [], texts: [] };
+                    return this.data.pages[pageNum];
+                },
+
+                // Attach overlay to a page wrapper
+                attachToPage(wrapper, pageNum, baseWidth, baseHeight) {
+                    if (!wrapper || !pageNum) return;
+                    if (this.pageLayers.has(pageNum)) {
+                        const existing = this.pageLayers.get(pageNum);
+                        if (existing && existing.layer && document.body.contains(existing.layer)) return; // already attached and present
+                        // otherwise remove stale reference and recreate
+                        this.pageLayers.delete(pageNum);
+                    } // already attached
+
+                    const notesLayer = document.createElement('div');
+                    notesLayer.className = 'notes-layer';
+                    notesLayer.style.width = baseWidth + 'px';
+                    notesLayer.style.height = baseHeight + 'px';
+                    notesLayer.dataset.page = pageNum;
+
+                    const notesCanvas = document.createElement('canvas');
+                    notesCanvas.className = 'notes-canvas';
+                    notesCanvas.style.width = baseWidth + 'px';
+                    notesCanvas.style.height = baseHeight + 'px';
+                    notesCanvas.width = Math.floor(baseWidth * (window.devicePixelRatio || 1));
+                    notesCanvas.height = Math.floor(baseHeight * (window.devicePixelRatio || 1));
+                    const nctx = notesCanvas.getContext('2d');
+                    nctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+
+                    const notesTextLayer = document.createElement('div');
+                    notesTextLayer.className = 'notes-text-layer';
+
+                    notesLayer.appendChild(notesCanvas);
+                    notesLayer.appendChild(notesTextLayer);
+
+                    wrapper.appendChild(notesLayer);
+
+                    // Store references
+                    this.pageLayers.set(pageNum, { layer: notesLayer, canvas: notesCanvas, ctx: nctx, textLayer: notesTextLayer, baseWidth, baseHeight });
+
+                    // Restore existing notes for this page
+                    this.redrawPage(pageNum);
+
+                    // Events: pointer handling for drawing and click for text notes
+                    let pointers = new Set();
+                    let drawing = false;
+                    let lastPoint = null;
+
+                    const pointerDown = (e) => {
+                        if (this.notesTool === 'none' || !['pen','pencil','marker','highlighter','eraser'].includes(this.notesTool)) return;
+                        // If multi-touch, ignore so pinch/scroll works
+                        if (e.pointerType === 'touch' && e.isPrimary === false && e.pointerId) {
+                            // allow other touch handlers
+                        }
+                        pointers.add(e.pointerId);
+                        if (pointers.size > 1) return; // two-finger gestures
+
+                        e.preventDefault();
+                        drawing = true;
+                        (e.target).setPointerCapture && (e.target).setPointerCapture(e.pointerId);
+                        const rect = e.target.getBoundingClientRect();
+                        lastPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+                        // Start action
+                        const pageData = this.ensurePageData(pageNum);
+                        const action = {
+                            type: this.notesTool === 'eraser' ? 'erase' : 'draw',
+                            tool: this.notesTool,
+                            color: this.color,
+                            thickness: this.notesTool === 'eraser' ? this.eraserSize : this.thickness,
+                            opacity: this.notesTool === 'highlighter' ? 0.35 : 1.0,
+                            points: [{ x: lastPoint.x / baseWidth, y: lastPoint.y / baseHeight }]
+                        };
+                        pageData.actions.push(action);
+                    };
+
+                    const pointerMove = (e) => {
+                        if (!drawing || pointers.size > 1) return;
+                        e.preventDefault();
+                        const rect = e.target.getBoundingClientRect();
+                        const point = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+                        const pageData = this.ensurePageData(pageNum);
+                        const action = pageData.actions[pageData.actions.length - 1];
+                        action.points.push({ x: point.x / baseWidth, y: point.y / baseHeight });
+
+                        // Draw incremental on canvas
+                        this._drawActionSegment(pageNum, action, baseWidth, baseHeight);
+                    };
+
+                    const pointerUp = (e) => {
+                        pointers.delete(e.pointerId);
+                        if (drawing) {
+                            drawing = false;
+                            lastPoint = null;
+                            this.scheduleSave();
+                        }
+                    };
+
+                    notesCanvas.addEventListener('pointerdown', pointerDown, { passive: false });
+                    notesCanvas.addEventListener('pointermove', pointerMove, { passive: false });
+                    notesCanvas.addEventListener('pointerup', pointerUp, { passive: false });
+                    notesCanvas.addEventListener('pointercancel', pointerUp, { passive: false });
+
+                    // Text note creation on click when text tool active
+                    notesCanvas.addEventListener('click', (e) => {
+                        if (this.notesTool !== 'text') return;
+                        const rect = notesCanvas.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const y = e.clientY - rect.top;
+                        this.createTextNote(pageNum, x / baseWidth, y / baseHeight);
+                    }, { passive: true });
+                },
+
+                // Draw entire page (replay actions)
+                redrawPage(pageNum) {
+                    const pageLayer = this.pageLayers.get(pageNum);
+                    const pageData = this.data.pages[pageNum];
+                    if (!pageLayer) return;
+                    const { canvas, ctx, baseWidth, baseHeight } = pageLayer;
+
+                    // Clear
+                    const dpr = window.devicePixelRatio || 1;
+                    // Clear full surface in device pixels
+                    ctx.setTransform(1,0,0,1,0,0);
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    // Set transform so subsequent drawing uses CSS pixel coordinates scaled to device pixels
+                    ctx.setTransform(dpr,0,0,dpr,0,0);
+
+                    if (pageData && pageData.actions) {
+                        for (const action of pageData.actions) {
+                            this._drawFullAction(pageNum, action, baseWidth, baseHeight);
+                        }
+                    }
+
+                    // Recreate text notes
+                    const textLayer = pageLayer.textLayer;
+                    textLayer.innerHTML = '';
+                    if (pageData && pageData.texts) {
+                        pageData.texts.forEach(t => this._renderTextItem(pageNum, t));
+                    }
+                },
+
+                _drawActionSegment(pageNum, action, baseWidth, baseHeight) {
+                    // Draw last two points for performance
+                    const pageLayer = this.pageLayers.get(pageNum);
+                    if (!pageLayer) return;
+                    const { ctx } = pageLayer;
+                    const pts = action.points;
+                    if (pts.length < 2) return;
+                    const p1 = pts[pts.length - 2];
+                    const p2 = pts[pts.length - 1];
+                    const x1 = p1.x * baseWidth;
+                    const y1 = p1.y * baseHeight;
+                    const x2 = p2.x * baseWidth;
+                    const y2 = p2.y * baseHeight;
+
+                    ctx.save();
+                    if (action.type === 'erase') {
+                        ctx.globalCompositeOperation = 'destination-out';
+                        ctx.strokeStyle = 'rgba(0,0,0,1)';
+                    } else if (action.tool === 'highlighter') {
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.strokeStyle = action.color || '#ffeb3b';
+                        ctx.globalAlpha = action.opacity || 0.35;
+                    } else {
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.strokeStyle = action.color || '#ffeb3b';
+                        ctx.globalAlpha = action.opacity || 1.0;
+                    }
+                    ctx.lineWidth = action.thickness || 3;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                    ctx.restore();
+                },
+
+                _drawFullAction(pageNum, action, baseWidth, baseHeight) {
+                    const pageLayer = this.pageLayers.get(pageNum);
+                    if (!pageLayer) return;
+                    const { ctx } = pageLayer;
+                    ctx.save();
+                    if (action.type === 'erase') {
+                        ctx.globalCompositeOperation = 'destination-out';
+                        ctx.strokeStyle = 'rgba(0,0,0,1)';
+                    } else if (action.tool === 'highlighter') {
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.strokeStyle = action.color || '#ffeb3b';
+                        ctx.globalAlpha = action.opacity || 0.35;
+                    } else {
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.strokeStyle = action.color || '#ffeb3b';
+                        ctx.globalAlpha = action.opacity || 1.0;
+                    }
+                    ctx.lineWidth = action.thickness || 3;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    const pts = action.points;
+                    if (pts.length > 0) {
+                        ctx.moveTo(pts[0].x * baseWidth, pts[0].y * baseHeight);
+                        for (let i = 1; i < pts.length; i++) {
+                            ctx.lineTo(pts[i].x * baseWidth, pts[i].y * baseHeight);
+                        }
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                },
+
+                createTextNote(pageNum, nx, ny, initialText = '') {
+                    const pageLayer = this.pageLayers.get(pageNum);
+                    if (!pageLayer) return;
+                    const { textLayer, baseWidth, baseHeight } = pageLayer;
+                    const div = document.createElement('div');
+                    div.className = 'note-text';
+                    div.contentEditable = 'true';
+                    div.spellcheck = false;
+                    div.innerText = initialText;
+                    div.style.left = (nx * baseWidth) + 'px';
+                    div.style.top = (ny * baseHeight) + 'px';
+                    div.addEventListener('input', (e) => this._autoSizeText(div));
+                    div.addEventListener('blur', () => {
+                        this._saveTextElement(pageNum, div);
+                    });
+                    div.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') div.blur();
+                        if (e.key === 'Enter' && e.shiftKey === false) {
+                            e.preventDefault();
+                            div.blur();
+                        }
+                    });
+                    textLayer.appendChild(div);
+                    this._autoSizeText(div);
+
+                    // Make movable via small handle and dragging
+                    this._makeTextMovable(pageNum, div);
+
+                    // Focus for user input; will persist on blur
+                    setTimeout(() => div.focus(), 50);
+                },
+
+                releasePage(pageNum) {
+                    const pageLayer = this.pageLayers.get(pageNum);
+                    if (!pageLayer) return;
+                    try {
+                        if (pageLayer.layer && pageLayer.layer.parentElement) pageLayer.layer.parentElement.removeChild(pageLayer.layer);
+                    } catch (e) {}
+                    this.pageLayers.delete(pageNum);
+                },
+
+                _autoSizeText(el) {
+                    el.style.width = 'auto';
+                    el.style.height = 'auto';
+                    const rect = el.getBoundingClientRect();
+                    // Limit width
+                    if (rect.width > (el.parentElement.clientWidth * 0.65)) {
+                        el.style.width = (el.parentElement.clientWidth * 0.65) + 'px';
+                    }
+                },
+
+                _saveTextElement(pageNum, el) {
+                    const pageLayer = this.pageLayers.get(pageNum);
+                    if (!pageLayer) return;
+                    const { baseWidth, baseHeight } = pageLayer;
+                    const rect = el.getBoundingClientRect();
+                    const parentRect = el.parentElement.getBoundingClientRect();
+                    const nx = (rect.left - parentRect.left) / baseWidth;
+                    const ny = (rect.top - parentRect.top) / baseHeight;
+                    const pageData = this.ensurePageData(pageNum);
+                    // Find the matching item (by proximity) — allow small tolerance
+                    let found = null;
+                    for (let t of pageData.texts) {
+                        if (Math.abs(t.x - nx) < 0.02 && Math.abs(t.y - ny) < 0.02) { found = t; break; }
+                    }
+                    if (found) {
+                        found.x = nx; found.y = ny; found.content = el.innerText;
+                    } else {
+                        pageData.texts.push({ x: nx, y: ny, content: el.innerText });
+                    }
+                    this.scheduleSave();
+                },
+
+                // Make a text note movable by adding a small drag handle
+                _makeTextMovable(pageNum, el) {
+                    // add handle element
+                    let handle = el.querySelector('.note-handle');
+                    if (!handle) {
+                        handle = document.createElement('div');
+                        handle.className = 'note-handle';
+                        el.appendChild(handle);
+                    }
+
+                    let dragging = false;
+                    let start = null;
+                    const onPointerDown = (e) => {
+                        e.preventDefault();
+                        dragging = true;
+                        start = { x: e.clientX, y: e.clientY };
+                        handle.setPointerCapture && handle.setPointerCapture(e.pointerId);
+                        handle.style.cursor = 'grabbing';
+                    };
+
+                    const onPointerMove = (e) => {
+                        if (!dragging) return;
+                        e.preventDefault();
+                        const dx = e.clientX - start.x;
+                        const dy = e.clientY - start.y;
+                        start = { x: e.clientX, y: e.clientY };
+                        const rect = el.getBoundingClientRect();
+                        const parentRect = el.parentElement.getBoundingClientRect();
+                        const newLeft = rect.left - parentRect.left + dx;
+                        const newTop = rect.top - parentRect.top + dy;
+                        el.style.left = newLeft + 'px';
+                        el.style.top = newTop + 'px';
+                    };
+
+                    const onPointerUp = (e) => {
+                        if (!dragging) return;
+                        dragging = false;
+                        try { handle.releasePointerCapture && handle.releasePointerCapture(e.pointerId);} catch (e) {}
+                        handle.style.cursor = 'grab';
+                        // Persist new position
+                        this._saveTextElement(pageNum, el);
+                    };
+
+                    handle.addEventListener('pointerdown', onPointerDown, { passive: false });
+                    window.addEventListener('pointermove', onPointerMove, { passive: false });
+                    window.addEventListener('pointerup', onPointerUp, { passive: true });
+                },
+
+
+                _renderTextItem(pageNum, t) {
+                    const pageLayer = this.pageLayers.get(pageNum);
+                    if (!pageLayer) return;
+                    const { textLayer, baseWidth, baseHeight } = pageLayer;
+                    const div = document.createElement('div');
+                    div.className = 'note-text';
+                    div.contentEditable = 'true';
+                    div.spellcheck = false;
+                    div.innerText = t.content || '';
+                    div.style.left = (t.x * baseWidth) + 'px';
+                    div.style.top = (t.y * baseHeight) + 'px';
+                    div.addEventListener('input', (e) => this._autoSizeText(div));
+                    div.addEventListener('blur', () => this._saveTextElement(pageNum, div));
+                    textLayer.appendChild(div);
+                    this._autoSizeText(div);
+                    // Make movable via small handle and dragging
+                    this._makeTextMovable(pageNum, div);
+                }
+            };
+
+            // Expose globally
+            window.NotesManager = {
+                init: (fileId) => Notes.init(fileId),
+                // Accept both (pageNum, wrapper) and (wrapper, pageNum, w, h)
+                attachToPage: (...args) => {
+                    try {
+                        if (args.length === 2 && typeof args[0] === 'number') {
+                            return Notes.attachToPage(args[1], args[0], args[1].dataset.baseWidth || args[1].style.width.replace('px','') , args[1].dataset.baseHeight || args[1].style.height.replace('px',''));
+                        } else if (args.length >= 2 && typeof args[0] !== 'number') {
+                            return Notes.attachToPage(args[0], args[1], args[2], args[3]);
+                        }
+                    } catch (e) { console.warn('attachToPage compatibility wrapper failed', e); }
+                },
+                detachFromPage: (pageNum) => Notes.releasePage(pageNum),
+                saveNotes: () => Notes.saveToStorage(),
+                loadNotes: () => Notes.loadFromStorage(),
+                redrawPage: (pageNum) => Notes.redrawPage(pageNum),
+                getNotesForPage: (pageNum) => Notes.data.pages[pageNum] || { actions: [], texts: [] },
+                setTool: (tool) => Notes.setTool(tool),
+                save: () => Notes.saveToStorage(),
+                releasePage: (pageNum) => Notes.releasePage(pageNum)
+            };
+
+            // Initialize when PDF loads
+            try {
+                // If PDF id variable exists, initialize with it after load
+                if (typeof id !== 'undefined' && id) {
+                    // Defer until after load to avoid race
+                    setTimeout(() => { window.NotesManager.init(id); }, 100);
+                }
+            } catch (e) {
+                console.warn('NotesManager init defer failed', e);
+            }
+        })();
     </script>
 
 </body>
