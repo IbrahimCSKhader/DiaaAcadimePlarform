@@ -1,3 +1,4 @@
+// API server root (includes /api when constructing endpoints)
 const API_BASE_URL = "https://diaaapi.premiumasp.net";
 fetch("Header.html")
   .then((response) => response.text())

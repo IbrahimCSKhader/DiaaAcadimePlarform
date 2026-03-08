@@ -1,4 +1,5 @@
 const container = document.getElementById("visited-container");
+// use the same base constant as other scripts if needed
 const apiUrl = "https://diaaapi.premiumasp.net/api/Summary/most-visited-new";
 
 fetch(apiUrl)

@@ -14,13 +14,14 @@ fetch("Footer.html")
   })
   .catch((e) => console.error("Error loading footer:", e));
 
-const BASE_URL = "https://diaaapi.premiumasp.net/api";
+// API host and base path (adjust once if it changes)
+const API_BASE = "https://diaaapi.premiumasp.net/api";
 let allSummaries = [];
 let specializations = [];
 
 async function loadSpecializations() {
   try {
-    const res = await fetch(`${BASE_URL}/Summary/specializations`);
+    const res = await fetch(`${API_BASE}/Summary/specializations`);
     if (!res.ok) throw new Error("Failed to load specializations");
     specializations = await res.json();
     const select = document.getElementById("specialization");
@@ -41,7 +42,7 @@ async function loadSummaries() {
   try {
     loading.style.display = "block";
     errorContainer.innerHTML = "";
-    const res = await fetch(`${BASE_URL}/Summary`);
+    const res = await fetch(`${API_BASE}/Summary`);
     if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
     allSummaries = await res.json();
     displaySummaries(allSummaries);
@@ -93,7 +94,7 @@ function filterSummaries() {
     filtered = filtered.filter((s) => s.specializationId == selectedSpec);
   if (searchTerm)
     filtered = filtered.filter((s) =>
-      (s.name || "").toLowerCase().includes(searchTerm)
+      (s.name || "").toLowerCase().includes(searchTerm),
     );
   displaySummaries(filtered);
 }
