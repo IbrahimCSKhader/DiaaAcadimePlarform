@@ -1063,6 +1063,48 @@ iframe {
     font-weight: 700;
 }
 
+.total-visits-card {
+    width: min(100%, 420px);
+    margin: 0 auto 35px;
+    padding: 22px 28px;
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    border-top: 4px solid var(--accent-color);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    text-align: right;
+}
+
+.total-visits-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex: 0 0 auto;
+}
+
+.total-visits-label {
+    color: var(--text-light);
+    margin-bottom: 4px;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.total-visits-count {
+    color: var(--primary-dark);
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 800;
+}
+
 .visited-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1480,6 +1522,11 @@ footer .footer-social-link:hover {
     .visited-grid {
         grid-template-columns: 1fr;
         gap: 20px;
+    }
+
+    .total-visits-card {
+        width: 100%;
+        padding: 20px;
     }
 
     .developers-section {
